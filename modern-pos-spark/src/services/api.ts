@@ -1,6 +1,12 @@
 // api.ts
-// Determine API base URL based on environment
+// Determine API base URL based on environment variables or default behavior
 const getApiBaseUrl = () => {
+  // Check for environment variable first
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // Fallback to previous logic
   if (typeof window !== 'undefined') {
     // In browser environment
     if (window.location.hostname.includes('vercel.app')) {
