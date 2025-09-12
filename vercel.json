@@ -5,7 +5,7 @@
       "src": "modern-pos-spark/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist"
+        "distDir": "modern-pos-spark/dist"
       }
     },
     {

@@ -1,12 +1,27 @@
 // api.ts
 // Determine API base URL based on environment
-const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') 
-  ? '/api'  // Use relative path for Vercel deployment
-  : 'http://localhost:3001/api';  // Use localhost for development
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // In browser environment
+    if (window.location.hostname.includes('vercel.app')) {
+      // For Vercel deployments, API is at the same domain
+      return '';
+    } else {
+      // For local development
+      return 'http://localhost:3001';
+    }
+  }
+  // For server-side rendering, fallback to localhost
+  return 'http://localhost:3001';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Helper function for API requests
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  // Ensure endpoint starts with /api
+  const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+  const url = `${API_BASE_URL}${normalizedEndpoint}`;
   
   const config: RequestInit = {
     headers: {
