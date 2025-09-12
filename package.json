@@ -1,0 +1,37 @@
+{
+  "name": "tally_pos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js",
+    "init-db": "node backend/init-db.js",
+    "init-empty-db": "node backend/init-empty-db.js",
+    "create-tables": "node backend/create-tables.js",
+    "verify-tables": "node backend/verify-tables.js",
+    "create-user": "node backend/create-user.js",
+    "setup-cpanel": "echo 'For cPanel setup, please follow the instructions in CPANEL_DATABASE_SETUP.md'",
+    "test-connection": "node backend/test-supabase-connection.js",
+    "check-env": "node backend/check-env.js",
+    "clear-data": "node backend/clear-data.js",
+    "init-supabase": "node backend/init-supabase-db.js",
+    "build-frontend": "cd modern-pos-spark && npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "mysql2": "^3.14.5",
+    "node-fetch": "^3.3.2",
+    "@supabase/supabase-js": "^2.48.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
