@@ -1,5 +1,8 @@
 // api.ts
-const API_BASE_URL = 'http://localhost:3001/api';
+// Determine API base URL based on environment
+const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') 
+  ? '/api'  // Use relative path for Vercel deployment
+  : 'http://localhost:3001/api';  // Use localhost for development
 
 // Helper function for API requests
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -68,12 +71,12 @@ export const ordersApi = {
 // Settings API
 export const settingsApi = {
   get: () => apiRequest<any>('/settings').then(data => ({
-    tax_rate: data.tax_rate,
+    tax_rate: data.tax_rate || data.taxRate,
     currency: data.currency,
-    business_name: data.business_name,
-    business_address: data.business_address,
-    business_phone: data.business_phone,
-    barcode_scanner_enabled: data.barcode_scanner_enabled
+    business_name: data.business_name || data.businessName,
+    business_address: data.business_address || data.businessAddress,
+    business_phone: data.business_phone || data.businessPhone,
+    barcode_scanner_enabled: data.barcode_scanner_enabled !== undefined ? data.barcode_scanner_enabled : data.barcodeScannerEnabled
   })),
   update: (settings: Partial<POSSettings>) => apiRequest<any>('/settings', {
     method: 'PUT',
@@ -86,12 +89,12 @@ export const settingsApi = {
       barcode_scanner_enabled: settings.barcodeScannerEnabled
     }),
   }).then(data => ({
-    tax_rate: data.tax_rate,
+    tax_rate: data.tax_rate || data.taxRate,
     currency: data.currency,
-    business_name: data.business_name,
-    business_address: data.business_address,
-    business_phone: data.business_phone,
-    barcode_scanner_enabled: data.barcode_scanner_enabled
+    business_name: data.business_name || data.businessName,
+    business_address: data.business_address || data.businessAddress,
+    business_phone: data.business_phone || data.businessPhone,
+    barcode_scanner_enabled: data.barcode_scanner_enabled !== undefined ? data.barcode_scanner_enabled : data.barcodeScannerEnabled
   })),
 };
 

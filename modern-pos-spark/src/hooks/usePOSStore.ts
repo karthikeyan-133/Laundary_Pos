@@ -43,15 +43,26 @@ const convertCustomerDataTypes = (customer: any): Customer => {
 
 // Helper function to convert settings data types
 const convertSettingsDataTypes = (settings: any): POSSettings => {
-  return {
-    ...settings,
-    taxRate: typeof settings.tax_rate === 'string' ? parseFloat(settings.tax_rate) : settings.tax_rate || 5.0,
+  console.log('Raw settings from API:', settings);
+  
+  // Handle both Supabase field names and potential JS field names
+  const taxRate = settings.tax_rate !== undefined ? settings.tax_rate : settings.taxRate;
+  const businessName = settings.business_name !== undefined ? settings.business_name : settings.businessName;
+  const businessAddress = settings.business_address !== undefined ? settings.business_address : settings.businessAddress;
+  const businessPhone = settings.business_phone !== undefined ? settings.business_phone : settings.businessPhone;
+  const barcodeScannerEnabled = settings.barcode_scanner_enabled !== undefined ? settings.barcode_scanner_enabled : settings.barcodeScannerEnabled;
+  
+  const convertedSettings = {
+    taxRate: typeof taxRate === 'string' ? parseFloat(taxRate) : (taxRate || 5.0),
     currency: settings.currency || 'AED',
-    businessName: settings.business_name || 'TallyPrime Café',
-    businessAddress: settings.business_address || 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE',
-    businessPhone: settings.business_phone || '+971 4 123 4567',
-    barcodeScannerEnabled: !!settings.barcode_scanner_enabled
+    businessName: businessName || 'TallyPrime Café',
+    businessAddress: businessAddress || 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE',
+    businessPhone: businessPhone || '+971 4 123 4567',
+    barcodeScannerEnabled: !!barcodeScannerEnabled
   };
+  
+  console.log('Converted settings:', convertedSettings);
+  return convertedSettings;
 };
 
 // Helper function to convert order data types
@@ -239,8 +250,17 @@ export function usePOSStore() {
     discountAmount = Math.min(discountAmount, subtotal);
     
     const discountedSubtotal = subtotal - discountAmount;
-    console.log('Calculating totals:', { subtotal, discountAmount, discountedSubtotal, taxRate: settings.taxRate });
-    const tax = discountedSubtotal * (settings.taxRate / 100);
+    console.log('Calculating totals:', { 
+      subtotal, 
+      discountAmount, 
+      discountedSubtotal, 
+      taxRate: settings.taxRate,
+      taxRateType: typeof settings.taxRate
+    });
+    
+    // Ensure taxRate is a number
+    const taxRate = typeof settings.taxRate === 'string' ? parseFloat(settings.taxRate) : settings.taxRate;
+    const tax = discountedSubtotal * (taxRate / 100);
     const total = discountedSubtotal + tax;
     
     console.log('Calculated totals:', { subtotal, discount: discountAmount, tax, total });
