@@ -11,12 +11,71 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost for development
+    if (origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1) {
+      return callback(null, true);
+    }
+    
+    // Allow Vercel deployments
+    if (origin.indexOf('.vercel.app') !== -1) {
+      return callback(null, true);
+    }
+    
+    // Add your production domain here
+    // if (origin === 'https://your-production-domain.com') {
+    //   return callback(null, true);
+    // }
+    
+    // For now, allow all origins in development
+    return callback(null, true);
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // Routes
 app.get('/', (req, res) => {
-  res.json({ message: 'Tally POS API with Supabase' });
+  res.json({ 
+    message: 'Tally POS API with Supabase',
+    timestamp: new Date().toISOString(),
+    status: 'healthy'
+  });
+});
+
+app.get('/health', async (req, res) => {
+  try {
+    // Test Supabase connection
+    const { data, error } = await supabase
+      .from('settings')
+      .select('id')
+      .limit(1);
+    
+    if (error) {
+      return res.status(503).json({ 
+        status: 'unhealthy', 
+        message: 'Database connection failed',
+        error: error.message 
+      });
+    }
+    
+    res.json({ 
+      status: 'healthy', 
+      message: 'API is running and database is connected',
+      timestamp: new Date().toISOString(),
+      database: 'connected'
+    });
+  } catch (err) {
+    res.status(503).json({ 
+      status: 'unhealthy', 
+      message: 'Health check failed',
+      error: err.message 
+    });
+  }
 });
 
 // Products routes

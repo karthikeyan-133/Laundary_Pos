@@ -17,6 +17,8 @@
     "clear-data": "node backend/clear-data.js",
     "init-supabase": "node backend/init-supabase-db.js",
     "build-frontend": "cd modern-pos-spark && npm run build",
+    "deploy-backend": "cd backend && vercel --prod",
+    "test-backend": "cd backend && node test-connection.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
