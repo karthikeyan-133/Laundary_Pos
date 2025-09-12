@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Modern POS Design System - Professional Business Theme */
+
+@layer base {
+  :root {
+    /* Core Colors - Professional Business Theme */
+    --background: 0 0% 98%; /* Very light gray/white background */
+    --foreground: 0 0% 15%; /* Dark text for readability */
+
+    --card: 0 0% 100%; /* Pure white cards */
+    --card-foreground: 0 0% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 15%;
+
+    /* Primary - Professional Blue (#065593) */
+    --primary: 202 96% 30%; /* #065593 Blue */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 202 96% 25%; /* Slightly darker on hover */
+    --primary-light: 202 96% 95%; /* Very light blue for backgrounds */
+
+    /* Secondary - Professional Gray */
+    --secondary: 0 0% 90%; /* Light gray */
+    --secondary-foreground: 0 0% 15%;
+    --secondary-hover: 0 0% 85%; /* Slightly darker on hover */
+
+    /* Success - Confirmation Green */
+    --success: 142 76% 36%; /* Standard success green */
+    --success-foreground: 0 0% 100%;
+    --success-light: 142 76% 96%; /* Light success background */
+
+    /* Warning - Attention Orange */
+    --warning: 25 95% 50%; /* Vibrant orange */
+    --warning-foreground: 0 0% 100%;
+    --warning-light: 25 95% 95%; /* Light warning background */
+
+    /* Destructive - Error Red */
+    --destructive: 0 84% 60%; /* Standard error red */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Muted - Subtle UI Elements */
+    --muted: 0 0% 95%; /* Very light gray */
+    --muted-foreground: 0 0% 50%; /* Medium gray text */
+
+    /* Accent - Highlights */
+    --accent: 202 96% 95%; /* Light blue accent */
+    --accent-foreground: 202 96% 30%; /* Blue text */
+
+    /* Borders & Inputs */
+    --border: 0 0% 85%; /* Light gray borders */
+    --input: 0 0% 85%;
+    --ring: 202 96% 30%; /* Blue focus ring */
+
+    /* Radius */
+    --radius: 0.5rem; /* 8px - Clean rounded corners */
+
+    /* POS Specific */
+    --pos-receipt: 40 80% 95%; /* Light yellow for receipt bg */
+    --pos-total: 202 96% 30%; /* Blue for totals */
+    --pos-discount: 25 95% 50%; /* Warning orange for discounts */
+    --pos-tax: 220 90% 60%; /* Blue for tax */
+
+    /* Shadows */
+    --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+    --shadow-medium: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --shadow-large: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+
+    /* Animations */
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  .dark {
+    --background: 0 0% 10%;
+    --foreground: 0 0% 90%;
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 90%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 90%;
+    --primary: 202 96% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 25%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 20%;
+    --accent-foreground: 0 0% 90%;
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 202 96% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  .pos-card {
+    @apply bg-card border-border shadow-soft rounded-lg;
+  }
+
+  .pos-button {
+    @apply transition-smooth hover:scale-[0.98] active:scale-95;
+  }
+
+  .pos-input {
+    @apply bg-card border-border focus:ring-primary focus:border-primary;
+  }
+
+  /* Print styles for receipts */
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    
+    .receipt-print, .receipt-print * {
+      visibility: visible;
+    }
+    
+    .receipt-print {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+    }
+    
+    @page {
+      size: 80mm auto;
+      margin: 0;
+    }
+  }
+}
