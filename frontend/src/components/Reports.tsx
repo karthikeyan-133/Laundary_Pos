@@ -34,13 +34,7 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
     if (!fromDate && !toDate) return orders;
     
     return orders.filter(order => {
-      // Handle invalid dates
-      const orderDateObj = new Date(order.createdAt);
-      if (!orderDateObj || isNaN(orderDateObj.getTime())) {
-        console.warn('Invalid date for order:', order.id);
-        return false; // Exclude orders with invalid dates
-      }
-      
+      const orderDate = new Date(order.createdAt);
       const from = fromDate ? new Date(fromDate) : null;
       const to = toDate ? new Date(toDate) : null;
       
@@ -50,8 +44,8 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
       }
       
       return (
-        (!from || orderDateObj >= from) &&
-        (!to || orderDateObj <= to)
+        (!from || orderDate >= from) &&
+        (!to || orderDate <= to)
       );
     });
   };
@@ -91,9 +85,7 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                     <tr key={order.id} className="border-b">
                       <td className="py-2">#{order.id.slice(-6)}</td>
                       <td className="py-2">
-                        {order.createdAt && !isNaN(new Date(order.createdAt).getTime()) 
-                          ? new Date(order.createdAt).toLocaleDateString() 
-                          : 'Invalid Date'}
+                        {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-2">AED {order.total.toFixed(2)}</td>
                       <td className="py-2">
@@ -211,14 +203,7 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
     const dailySales: { [key: string]: { date: string, orders: number, revenue: number } } = {};
     
     filteredOrders.forEach(order => {
-      // Handle invalid dates
-      const orderDate = new Date(order.createdAt);
-      if (!orderDate || isNaN(orderDate.getTime())) {
-        console.warn('Invalid date for order:', order.id);
-        return;
-      }
-      
-      const date = orderDate.toLocaleDateString();
+      const date = new Date(order.createdAt).toLocaleDateString();
       if (dailySales[date]) {
         dailySales[date].orders += 1;
         dailySales[date].revenue += order.total;
@@ -310,9 +295,7 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                       <tr key={order.id} className="border-b">
                         <td className="py-2">#{order.id.slice(-6)}</td>
                         <td className="py-2">
-                          {order.createdAt && !isNaN(new Date(order.createdAt).getTime()) 
-                            ? new Date(order.createdAt).toLocaleDateString() 
-                            : 'Invalid Date'}
+                          {new Date(order.createdAt).toLocaleDateString()}
                         </td>
                         <td className="py-2">{order.customer.name}</td>
                         <td className="py-2">{order.customer.address || 'N/A'}</td>

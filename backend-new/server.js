@@ -300,14 +300,7 @@ app.get('/api/orders', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch orders' });
     }
     
-    // Map database field names to frontend field names
-    const mappedData = data.map(order => ({
-      ...order,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at
-    }));
-    
-    res.json(mappedData);
+    res.json(data);
   } catch (err) {
     console.error('Error fetching orders:', err);
     return res.status(500).json({ error: 'Failed to fetch orders' });
@@ -351,22 +344,9 @@ app.get('/api/orders/:id', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch order items' });
     }
     
-    // Map database field names to frontend field names
-    const mappedOrder = {
-      ...order,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at
-    };
-    
-    const mappedItems = items.map(item => ({
-      ...item,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at
-    }));
-    
     const orderWithItems = {
-      ...mappedOrder,
-      items: mappedItems
+      ...order,
+      items: items
     };
     
     res.json(orderWithItems);

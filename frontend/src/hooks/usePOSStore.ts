@@ -69,13 +69,12 @@ const convertSettingsDataTypes = (settings: any): POSSettings => {
 const convertOrderDataTypes = (order: any): Order => {
   return {
     ...order,
-    // Map database field names to frontend field names
-    createdAt: order.createdAt || order.created_at || new Date(),
-    updatedAt: order.updatedAt || order.updated_at || new Date(),
     subtotal: typeof order.subtotal === 'string' ? parseFloat(order.subtotal) : order.subtotal,
     discount: typeof order.discount === 'string' ? parseFloat(order.discount) : order.discount,
     tax: typeof order.tax === 'string' ? parseFloat(order.tax) : order.tax,
     total: typeof order.total === 'string' ? parseFloat(order.total) : order.total,
+    createdAt: typeof order.createdAt === 'string' ? new Date(order.createdAt) : order.createdAt,
+    updatedAt: typeof order.updatedAt === 'string' ? new Date(order.updatedAt) : order.updatedAt,
     items: order.items ? order.items.map((item: any) => ({
       ...item,
       product: convertProductDataTypes(item.product),
