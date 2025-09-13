@@ -2,25 +2,25 @@
   "version": 2,
   "builds": [
     {
-      "src": "modern-pos-spark/package.json",
+      "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "modern-pos-spark/dist"
+        "distDir": "frontend/dist"
       }
     },
     {
-      "src": "backend/server.js",
+      "src": "backend-new/server.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend/server.js"
+      "dest": "backend-new/server.js"
     },
     {
       "src": "/(.*)",
-      "dest": "modern-pos-spark/dist/$1"
+      "dest": "frontend/dist/$1"
     }
   ]
 }

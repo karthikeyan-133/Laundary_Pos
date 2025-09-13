@@ -2,12 +2,22 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
-const envPath = path.resolve(__dirname, '.env');
-dotenv.config({ path: envPath });
-// Replace MySQL with Supabase
-const { supabase } = require('./supabaseDb');
+
+// Check if we're running on Vercel
+const isVercel = !!process.env.VERCEL;
+
+// Load environment variables only in local development
+if (!isVercel) {
+  const envPath = path.resolve(__dirname, '.env');
+  dotenv.config({ path: envPath });
+}
+
+// Import Supabase client
+const supabase = require('./supabaseClient');
 
 const app = express();
+
+// Use Vercel's PORT or default to 3001
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -26,7 +36,7 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Add your production domain here
+    // Add your production domain here when you have one
     // if (origin === 'https://your-production-domain.com') {
     //   return callback(null, true);
     // }
@@ -481,7 +491,14 @@ app.put('/api/settings', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT} with Supabase database`);
-});
+// Vercel requires us to export the app, not start the server directly
+// Only start the server if not running on Vercel
+if (!process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT} with Supabase database`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+  });
+}
+
+// Export the app for Vercel
+module.exports = app;
