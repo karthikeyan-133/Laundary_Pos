@@ -15,7 +15,7 @@ const defaultSettings: POSSettings = {
 // Sample customers data (will be replaced by API)
 const sampleCustomers: Customer[] = [
   {
-    id: '1',
+    id: 'default-walk-in',
     name: 'Walk-in Customer',
     code: 'WIC001',
     phone: '',
@@ -67,20 +67,68 @@ const convertSettingsDataTypes = (settings: any): POSSettings => {
 
 // Helper function to convert order data types
 const convertOrderDataTypes = (order: any): Order => {
+  // Helper function to safely convert date strings to Date objects
+  const safeDateConversion = (dateValue: string | Date | undefined | null): Date => {
+    if (!dateValue) {
+      return new Date(); // Return current date as fallback
+    }
+    
+    if (dateValue instanceof Date) {
+      return dateValue;
+    }
+    
+    // Try to parse the string date
+    const parsedDate = new Date(dateValue);
+    
+    // Check if the parsed date is valid
+    if (isNaN(parsedDate.getTime())) {
+      return new Date(); // Return current date as fallback for invalid dates
+    }
+    
+    return parsedDate;
+  };
+  
+  // Map snake_case field names from backend to camelCase expected by frontend
+  const createdAt = order.created_at !== undefined ? order.created_at : order.createdAt;
+  const updatedAt = order.updated_at !== undefined ? order.updated_at : order.updatedAt;
+  const paymentMethod = order.payment_method !== undefined ? order.payment_method : order.paymentMethod;
+  const cashAmount = order.cash_amount !== undefined ? order.cash_amount : order.cashAmount;
+  const cardAmount = order.card_amount !== undefined ? order.card_amount : order.cardAmount;
+  const deliveryStatus = order.delivery_status !== undefined ? order.delivery_status : order.deliveryStatus;
+  const paymentStatus = order.payment_status !== undefined ? order.payment_status : order.paymentStatus;
+  
+  // Extract customer data from nested 'customers' property
+  let customer: Customer;
+  if (order.customers) {
+    customer = {
+      id: order.customer_id,
+      ...order.customers
+    };
+  } else {
+    customer = order.customer;
+  }
+  
   return {
     ...order,
+    customer, // Use the properly extracted customer data
+    paymentMethod, // Ensure correct field mapping
+    cashAmount, // Ensure correct field mapping
+    cardAmount, // Ensure correct field mapping
+    deliveryStatus, // Ensure correct field mapping
+    paymentStatus, // Ensure correct field mapping
     subtotal: typeof order.subtotal === 'string' ? parseFloat(order.subtotal) : order.subtotal,
     discount: typeof order.discount === 'string' ? parseFloat(order.discount) : order.discount,
     tax: typeof order.tax === 'string' ? parseFloat(order.tax) : order.tax,
     total: typeof order.total === 'string' ? parseFloat(order.total) : order.total,
-    createdAt: typeof order.createdAt === 'string' ? new Date(order.createdAt) : order.createdAt,
-    updatedAt: typeof order.updatedAt === 'string' ? new Date(order.updatedAt) : order.updatedAt,
-    items: order.items ? order.items.map((item: any) => ({
+    createdAt: safeDateConversion(createdAt),
+    updatedAt: safeDateConversion(updatedAt),
+    // Ensure items array exists and convert item data types
+    items: order.items && Array.isArray(order.items) ? order.items.map((item: any) => ({
       ...item,
       product: convertProductDataTypes(item.product),
       subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal,
       discount: typeof item.discount === 'string' ? parseFloat(item.discount) : item.discount
-    })) : order.items
+    })) : []
   };
 };
 
@@ -111,6 +159,17 @@ export function usePOSStore() {
         // Convert data types for products
         const convertedProducts = fetchedProducts.map(convertProductDataTypes);
         setProducts(convertedProducts);
+        
+        // Load customers
+        const fetchedCustomers = await customersApi.getAll();
+        // Convert data types for customers
+        const convertedCustomers = fetchedCustomers.map(convertCustomerDataTypes);
+        setCustomers(convertedCustomers);
+        
+        // If we have customers, set the first one as the default customer
+        if (convertedCustomers.length > 0) {
+          setCustomer(convertedCustomers[0]);
+        }
         
         // Load orders
         const fetchedOrders = await ordersApi.getAll();
@@ -229,7 +288,8 @@ export function usePOSStore() {
 
   const clearCart = () => {
     setCart([]);
-    setCustomer(sampleCustomers[0]); // Reset to default customer
+    // Reset to default customer (first customer from the list or sample customer if list is empty)
+    setCustomer(customers.length > 0 ? customers[0] : sampleCustomers[0]);
     setCartDiscountState({ type: 'percentage', value: 0 }); // Reset cart discount
     setIsCartHeld(false);
     setCurrentHoldId(null);
@@ -268,7 +328,7 @@ export function usePOSStore() {
     return { subtotal, discount: discountAmount, tax, total };
   };
 
-  const createOrder = async (paymentMethod: Order['paymentMethod'] = 'cash') => {
+  const createOrder = async (paymentMethod: Order['paymentMethod'] = 'cash', cashAmount?: number, cardAmount?: number) => {
     if (cart.length === 0) return null;
 
     try {
@@ -282,6 +342,8 @@ export function usePOSStore() {
         tax,
         total,
         payment_method: paymentMethod,
+        cash_amount: cashAmount, // Add cash amount for split payments
+        card_amount: cardAmount, // Add card amount for split payments
         status: 'completed' as const,
         delivery_status: undefined,
         payment_status: undefined,
@@ -304,8 +366,8 @@ export function usePOSStore() {
       // Send to API
       const createdOrder = await ordersApi.create(newOrderData);
       
-      // Update local state
-      setOrders(prev => [createdOrder, ...prev]);
+      // Reload orders to ensure we have the latest data
+      await reloadOrders();
       clearCart();
       
       return createdOrder;
@@ -313,6 +375,19 @@ export function usePOSStore() {
       console.error('Failed to create order:', err);
       setError('Failed to create order');
       return null;
+    }
+  };
+
+  // Add a function to reload orders data
+  const reloadOrders = async () => {
+    try {
+      const fetchedOrders = await ordersApi.getAll();
+      // Convert data types for orders
+      const convertedOrders = fetchedOrders.map(convertOrderDataTypes);
+      setOrders(convertedOrders);
+    } catch (err) {
+      console.error('Failed to reload orders:', err);
+      setError('Failed to reload orders');
     }
   };
 
@@ -353,7 +428,7 @@ export function usePOSStore() {
 
   const getTodayCustomers = (orderList: Order[] = orders) => {
     const todayOrders = getTodayOrders(orderList);
-    const uniqueCustomers = new Set(todayOrders.map(order => order.customer.name));
+    const uniqueCustomers = new Set(todayOrders.map(order => order.customer?.name || 'Unknown Customer'));
     return uniqueCustomers.size;
   };
 
@@ -362,9 +437,12 @@ export function usePOSStore() {
     const productSet = new Set<string>();
     
     todayOrders.forEach(order => {
-      order.items.forEach(item => {
-        productSet.add(item.product.id);
-      });
+      // Add safety check for order.items
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach(item => {
+          productSet.add(item.product.id);
+        });
+      }
     });
     
     return productSet.size;
@@ -533,30 +611,32 @@ export function usePOSStore() {
   // Update order payment status (for COD orders)
   const updateOrderPaymentStatus = async (orderId: string, paymentStatus: 'paid' | 'unpaid', paymentMethod?: Order['paymentMethod']) => {
     try {
-      // In a real implementation, you would call an API endpoint to update the order
-      // For now, we'll just update the local state
-      setOrders(prev => prev.map(order => {
-        if (order.id === orderId) {
-          const updatedOrder = {
-            ...order,
-            paymentStatus,
-            updatedAt: new Date()
-          };
-          
-          // If payment method is provided, update it
-          if (paymentMethod) {
-            updatedOrder.paymentMethod = paymentMethod;
-          }
-          
-          // If payment is made, update order status to completed
-          if (paymentStatus === 'paid') {
-            updatedOrder.status = 'completed';
-          }
-          
-          return updatedOrder;
-        }
-        return order;
-      }));
+      // Prepare the update data
+      const updateData: Partial<Order> = {
+        paymentStatus,
+        updatedAt: new Date()
+      };
+      
+      // If payment method is provided, update it
+      if (paymentMethod) {
+        updateData.paymentMethod = paymentMethod;
+      }
+      
+      // If payment is made, update order status to completed
+      if (paymentStatus === 'paid') {
+        updateData.status = 'completed';
+      }
+      
+      // Call API to update the order
+      const updatedOrder = await ordersApi.update(orderId, updateData);
+      
+      // Convert data types for the returned order
+      const convertedOrder = convertOrderDataTypes(updatedOrder);
+      
+      // Update local state
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? convertedOrder : order
+      ));
     } catch (err) {
       console.error('Failed to update order payment status:', err);
       setError('Failed to update order payment status');
@@ -566,18 +646,22 @@ export function usePOSStore() {
   // Update order delivery status
   const updateOrderDeliveryStatus = async (orderId: string, deliveryStatus: 'pending' | 'in-transit' | 'delivered') => {
     try {
-      // In a real implementation, you would call an API endpoint to update the order
-      // For now, we'll just update the local state
-      setOrders(prev => prev.map(order => {
-        if (order.id === orderId) {
-          return {
-            ...order,
-            deliveryStatus,
-            updatedAt: new Date()
-          };
-        }
-        return order;
-      }));
+      // Prepare the update data
+      const updateData: Partial<Order> = {
+        deliveryStatus,
+        updatedAt: new Date()
+      };
+      
+      // Call API to update the order
+      const updatedOrder = await ordersApi.update(orderId, updateData);
+      
+      // Convert data types for the returned order
+      const convertedOrder = convertOrderDataTypes(updatedOrder);
+      
+      // Update local state
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? convertedOrder : order
+      ));
     } catch (err) {
       console.error('Failed to update order delivery status:', err);
       setError('Failed to update order delivery status');

@@ -32,6 +32,7 @@ import { ProductManagement } from '@/components/ProductManagement';
 const Index = () => {
   const [activeView, setActiveView] = useState<'pos' | 'receipt' | 'dashboard' | 'reports' | 'products' | 'return-bills' | 'return-items' | 'product-management' | 'home-delivery'>('pos');
   const [selectedOrderForReturn, setSelectedOrderForReturn] = useState<Order | null>(null);
+  const [returnType, setReturnType] = useState<'complete' | 'partial' | null>(null);
   const navigate = useNavigate();
   
   const {
@@ -72,6 +73,7 @@ const Index = () => {
 
   const totals = calculateTotals();
   const lastOrder = orders[0] || null;
+  console.log('Index.tsx - orders data:', orders);
 
   // Show loading state
   if (loading) {
@@ -109,9 +111,12 @@ const Index = () => {
     navigate('/');
   };
 
-  const handleReturnOrder = (order: Order) => {
+  const handleReturnOrder = (order: Order, type: 'complete' | 'partial' | null = null) => {
+    console.log('handleReturnOrder called with order:', order, 'and type:', type);
     setSelectedOrderForReturn(order);
+    setReturnType(type);
     setActiveView('return-items');
+    console.log('State updated: selectedOrderForReturn set and activeView set to return-items');
   };
 
   return (
@@ -237,7 +242,7 @@ const Index = () => {
 
         {activeView === 'reports' && (
           <div className="mt-6">
-            <Reports orders={orders} onReturnOrder={handleReturnOrder} />
+            <Reports orders={orders} onReturnOrder={(order, type) => handleReturnOrder(order, type)} />
           </div>
         )}
 
@@ -271,7 +276,7 @@ const Index = () => {
             </div>
             {activeView === 'return-bills' ? 
               <ReturnByBills /> : 
-              <ReturnByItems preselectedOrder={selectedOrderForReturn} />
+              <ReturnByItems preselectedOrder={selectedOrderForReturn} returnType={returnType} />
             }
           </div>
         )}

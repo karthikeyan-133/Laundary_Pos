@@ -2,6 +2,54 @@
 
 This directory contains the backend API for the Tally POS application, built with Node.js and Express.
 
+## Local Development Setup
+
+### Prerequisites
+
+1. Node.js (v16 or higher)
+2. npm (comes with Node.js)
+3. A Supabase account with a project created
+
+### Environment Variables
+
+For local development, copy the `.env.example` file to `.env` and update the values:
+
+```bash
+cp .env.example .env
+```
+
+Then edit the `.env` file and replace the placeholder values with your actual Supabase credentials:
+
+- `SUPABASE_URL` - Your Supabase project URL (e.g., https://your-project.supabase.co)
+- `SUPABASE_KEY` - Your Supabase anon key (found in your Supabase project settings)
+- `PORT` - The port for the server (optional, defaults to 3001)
+
+### Installing Dependencies
+
+All dependencies are managed in the root directory. Make sure to install them:
+
+```bash
+cd ..
+npm install
+```
+
+### Running the Server Locally
+
+To run the backend locally:
+
+```bash
+cd ..
+npm start
+```
+
+Or directly from this directory:
+
+```bash
+node server.js
+```
+
+The server will start on the port specified in your `.env` file (default: 3001).
+
 ## Deployment to Vercel
 
 The backend can be deployed to Vercel as a serverless function. When deployed through the root directory's vercel.json configuration, Vercel will automatically handle the deployment of this backend.
@@ -26,21 +74,6 @@ The following environment variables must be set in your Vercel project:
 - `/api/customers` - Customer management
 - `/api/orders` - Order processing
 - `/api/settings` - Application settings
-
-### Local Development
-
-To run the backend locally:
-
-```bash
-cd ..
-npm start
-```
-
-Or directly from this directory:
-
-```bash
-node server.js
-```
 
 ### Supabase Integration
 

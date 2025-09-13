@@ -51,9 +51,12 @@ export function ReturnByBills() {
     setSelectedOrder(order);
     // Initialize return quantities to 0 for all items
     const initialReturnItems: Record<string, number> = {};
-    order.items.forEach(item => {
-      initialReturnItems[item.id] = 0;
-    });
+    // Add safety check for order.items
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach(item => {
+        initialReturnItems[item.id] = 0;
+      });
+    }
     setReturnItems(initialReturnItems);
   };
 
@@ -69,6 +72,9 @@ export function ReturnByBills() {
 
   const calculateReturnTotal = () => {
     if (!selectedOrder) return 0;
+    
+    // Add safety check for selectedOrder.items
+    if (!selectedOrder.items || !Array.isArray(selectedOrder.items)) return 0;
     
     return selectedOrder.items.reduce((total, item) => {
       const returnQuantity = returnItems[item.id] || 0;
@@ -226,30 +232,38 @@ export function ReturnByBills() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {selectedOrder.items.map(item => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{item.product.name}</div>
-                          <div className="text-sm text-gray-500">{item.product.sku}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>AED {item.product.price.toFixed(2)}</TableCell>
-                      <TableCell>{item.discount}%</TableCell>
-                      <TableCell>AED {item.subtotal.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          max={item.quantity}
-                          value={returnItems[item.id] || 0}
-                          onChange={(e) => handleReturnQuantityChange(item.id, parseInt(e.target.value) || 0)}
-                          className="w-20"
-                        />
+                  {selectedOrder.items && Array.isArray(selectedOrder.items) ? (
+                    selectedOrder.items.map(item => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{item.product.name}</div>
+                            <div className="text-sm text-gray-500">{item.product.sku}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell>AED {item.product.price.toFixed(2)}</TableCell>
+                        <TableCell>{item.discount}%</TableCell>
+                        <TableCell>AED {item.subtotal.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min="0"
+                            max={item.quantity}
+                            value={returnItems[item.id] || 0}
+                            onChange={(e) => handleReturnQuantityChange(item.id, parseInt(e.target.value) || 0)}
+                            className="w-20"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-gray-500">
+                        No items found for this order
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
               

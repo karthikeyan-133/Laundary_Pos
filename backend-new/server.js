@@ -359,9 +359,15 @@ app.get('/api/orders/:id', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   // Generate a unique ID if not provided
   const id = req.body.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  const { customer_id, subtotal, discount, tax, total, payment_method, status, delivery_status, payment_status, items } = req.body;
+  const { customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status, items } = req.body;
   
   try {
+    // Check if Supabase is properly configured
+    if (!supabase || !supabase.from) {
+      console.error('Supabase not properly configured');
+      return res.status(500).json({ error: 'Database not configured properly' });
+    }
+    
     // Insert order
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
@@ -374,6 +380,8 @@ app.post('/api/orders', async (req, res) => {
           tax, 
           total, 
           payment_method, 
+          cash_amount, 
+          card_amount, 
           status, 
           delivery_status, 
           payment_status 
@@ -384,7 +392,7 @@ app.post('/api/orders', async (req, res) => {
     
     if (orderError) {
       console.error('Error creating order:', orderError);
-      return res.status(500).json({ error: 'Failed to create order' });
+      return res.status(500).json({ error: 'Failed to create order: ' + orderError.message });
     }
     
     // Insert order items
@@ -404,14 +412,83 @@ app.post('/api/orders', async (req, res) => {
       
       if (itemsError) {
         console.error('Error creating order items:', itemsError);
-        return res.status(500).json({ error: 'Failed to create order items' });
+        return res.status(500).json({ error: 'Failed to create order items: ' + itemsError.message });
       }
     }
     
     res.status(201).json(orderData);
   } catch (err) {
     console.error('Error creating order:', err);
-    return res.status(500).json({ error: 'Failed to create order' });
+    return res.status(500).json({ error: 'Failed to create order: ' + err.message });
+  }
+});
+
+// PUT endpoint for updating orders
+app.put('/api/orders/:id', async (req, res) => {
+  const { id } = req.params;
+  const { customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status, items } = req.body;
+  
+  try {
+    // Check if Supabase is properly configured
+    if (!supabase || !supabase.from) {
+      console.error('Supabase not properly configured');
+      return res.status(500).json({ error: 'Database not configured properly' });
+    }
+    
+    // Update order
+    const updateData = {};
+    if (customer_id !== undefined) updateData.customer_id = customer_id;
+    if (subtotal !== undefined) updateData.subtotal = subtotal;
+    if (discount !== undefined) updateData.discount = discount;
+    if (tax !== undefined) updateData.tax = tax;
+    if (total !== undefined) updateData.total = total;
+    if (payment_method !== undefined) updateData.payment_method = payment_method;
+    if (cash_amount !== undefined) updateData.cash_amount = cash_amount;
+    if (card_amount !== undefined) updateData.card_amount = card_amount;
+    if (status !== undefined) updateData.status = status;
+    if (delivery_status !== undefined) updateData.delivery_status = delivery_status;
+    if (payment_status !== undefined) updateData.payment_status = payment_status;
+    
+    // Only update if there's data to update
+    if (Object.keys(updateData).length > 0) {
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', id)
+        .select();
+      
+      if (orderError) {
+        console.error('Error updating order:', orderError);
+        return res.status(500).json({ error: 'Failed to update order: ' + orderError.message });
+      }
+      
+      // Check if any rows were updated
+      if (!orderData || orderData.length === 0) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+      
+      res.json(orderData[0]);
+    } else {
+      // If no update data provided, just return the order
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', id);
+      
+      if (orderError) {
+        console.error('Error fetching order:', orderError);
+        return res.status(500).json({ error: 'Failed to fetch order: ' + orderError.message });
+      }
+      
+      if (!orderData || orderData.length === 0) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+      
+      res.json(orderData[0]);
+    }
+  } catch (err) {
+    console.error('Error updating order:', err);
+    return res.status(500).json({ error: 'Failed to update order: ' + err.message });
   }
 });
 

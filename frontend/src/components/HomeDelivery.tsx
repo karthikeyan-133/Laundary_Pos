@@ -84,7 +84,7 @@ export function HomeDelivery({
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {order.customer.name} • {new Date(order.createdAt).toLocaleDateString()}
+                        {order.customer?.name || 'Unknown Customer'} • {new Date(order.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -112,7 +112,7 @@ export function HomeDelivery({
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Items</p>
-                      <p className="font-medium">{order.items.length}</p>
+                      <p className="font-medium">{order.items && Array.isArray(order.items) ? order.items.length : 0}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Total Amount</p>

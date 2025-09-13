@@ -87,6 +87,10 @@ export const ordersApi = {
     method: 'POST',
     body: JSON.stringify(order),
   }),
+  update: (id: string, order: Partial<Order>) => apiRequest<Order>(`/orders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(order),
+  }),
 };
 
 // Settings API
@@ -159,6 +163,8 @@ type Order = {
   tax: number;
   total: number;
   paymentMethod: 'cash' | 'card' | 'credit' | 'both' | 'cod';
+  cashAmount?: number; // Add cash amount for split payments
+  cardAmount?: number; // Add card amount for split payments
   status: 'completed' | 'pending' | 'cancelled';
   deliveryStatus?: 'pending' | 'in-transit' | 'delivered';
   paymentStatus?: 'paid' | 'unpaid';

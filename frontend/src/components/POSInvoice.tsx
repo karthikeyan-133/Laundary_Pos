@@ -40,7 +40,7 @@ interface POSInvoiceProps {
   onRemoveItem: (itemId: string) => void;
   onCustomerChange: (customer: Customer) => void;
   onAddCustomer: (customer: Customer) => Customer;
-  onCheckout: (paymentMethod: Order['paymentMethod']) => Order | null;
+  onCheckout: (paymentMethod: Order['paymentMethod'], cashAmount?: number, cardAmount?: number) => Order | null;
   onClearCart: () => void;
   onSetCartDiscount: (type: 'flat' | 'percentage', value: number) => void;
   onHoldCart: () => string | null;
@@ -109,9 +109,8 @@ export function POSInvoice({
   const handleSplitPaymentConfirm = (cashAmount: number, cardAmount: number) => {
     setShowSplitPaymentPopup(false);
     
-    // For now, we'll just proceed with the checkout using 'both' as the payment method
-    // In a real implementation, you might want to store the split amounts in the order
-    const order = onCheckout('both');
+    // Pass the cash and card amounts to the checkout function
+    const order = onCheckout('both', cashAmount, cardAmount);
     if (order) {
       setPaymentMethod('cash');
       toast({

@@ -1,4 +1,13 @@
-const { createClient } = require('@supabase/supabase-js');
+// Import Supabase with error handling
+let createClient;
+try {
+  ({ createClient } = require('@supabase/supabase-js'));
+} catch (error) {
+  console.error('Failed to import @supabase/supabase-js:', error);
+  console.error('Please ensure the package is installed by running "npm install" in the root directory');
+  process.exit(1);
+}
+
 const path = require('path');
 const dotenv = require('dotenv');
 
@@ -29,20 +38,84 @@ if (!supabaseUrl || !supabaseKey) {
     console.log('Expected .env path:', path.resolve(__dirname, '.env'));
   } else {
     console.log('For Vercel deployment, ensure SUPABASE_URL and SUPABASE_KEY are set in your Vercel project Environment Variables.');
+    console.log('Go to your Vercel dashboard -> Settings -> Environment Variables');
+    console.log('Add SUPABASE_URL and SUPABASE_KEY with your Supabase project credentials');
   }
-  process.exit(1);
+  // Don't exit in Vercel as it might cause deployment issues
+  if (!isVercel) {
+    process.exit(1);
+  }
 }
 
-// Create a Supabase client
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false
+// Create a Supabase client (only if we have the required variables)
+let supabase;
+if (supabaseUrl && supabaseKey) {
+  try {
+    // Validate that the URL is valid
+    if (supabaseUrl !== 'your_supabase_project_url_here' && supabaseUrl.startsWith('http')) {
+      supabase = createClient(supabaseUrl, supabaseKey, {
+        auth: {
+          persistSession: false
+        }
+      });
+    } else {
+      supabase = null;
+    }
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    supabase = null;
   }
-});
+} else {
+  supabase = null;
+}
+
+// If Supabase client couldn't be created, create a mock client
+if (!supabase) {
+  // Create a mock client for environments where variables aren't set
+  const createMockQuery = () => ({
+    select: () => createMockQuery(),
+    insert: () => createMockQuery(),
+    update: () => createMockQuery(),
+    delete: () => createMockQuery(),
+    eq: () => createMockQuery(),
+    limit: () => createMockQuery(),
+    single: () => createMockQuery(),
+    from: () => createMockQuery()
+  });
+  
+  supabase = {
+    from: () => ({
+      select: () => createMockQuery(),
+      insert: () => createMockQuery(),
+      update: () => createMockQuery(),
+      delete: () => createMockQuery(),
+      eq: () => createMockQuery(),
+      limit: () => createMockQuery(),
+      single: () => createMockQuery()
+    })
+  };
+  console.warn('⚠️  Supabase client not properly configured - using mock client');
+}
 
 // Test the connection
 async function testConnection() {
   try {
+    if (!supabaseUrl || !supabaseKey || supabaseUrl === 'your_supabase_project_url_here') {
+      console.log('⚠️  Supabase not configured - skipping connection test');
+      return;
+    }
+    
+    if (!supabase) {
+      console.log('⚠️  Supabase client not created - skipping connection test');
+      return;
+    }
+    
+    // Skip test for mock client
+    if (!supabaseUrl.startsWith('http')) {
+      console.log('⚠️  Using mock client - skipping connection test');
+      return;
+    }
+    
     const { data, error } = await supabase
       .from('settings')
       .select('id')

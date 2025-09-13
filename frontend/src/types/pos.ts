@@ -37,6 +37,8 @@ export type Order = {
   tax: number;
   total: number;
   paymentMethod: 'cash' | 'card' | 'credit' | 'both' | 'cod';
+  cashAmount?: number; // Add cash amount for split payments
+  cardAmount?: number; // Add card amount for split payments
   status: 'completed' | 'pending' | 'cancelled';
   deliveryStatus?: 'pending' | 'in-transit' | 'delivered'; // Add delivery status
   paymentStatus?: 'paid' | 'unpaid'; // Add payment status for COD orders

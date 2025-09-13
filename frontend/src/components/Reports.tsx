@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import { Order, Product } from '@/types/pos';
 
 interface ReportsProps {
   orders: Order[];
-  onReturnOrder?: (order: Order) => void;
+  onReturnOrder?: (order: Order, type: 'complete' | 'partial' | null) => void;
 }
 
 export function Reports({ orders, onReturnOrder }: ReportsProps) {
@@ -28,13 +28,57 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
   >('bill');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
+  const [showReturnOptions, setShowReturnOptions] = useState<boolean>(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [returnType, setReturnType] = useState<'complete' | 'partial' | null>(null);
+
+  // Safe date formatting function
+  const formatDate = (date: Date | string | undefined | null): string => {
+    // Handle undefined, null, or empty values
+    if (!date) {
+      return 'Invalid Date';
+    }
+    
+    // If it's already a Date object, use it directly
+    let dateObj: Date;
+    if (date instanceof Date) {
+      dateObj = date;
+    } else {
+      // If it's a string, try to parse it
+      dateObj = new Date(date);
+    }
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid Date';
+    }
+    
+    return dateObj.toLocaleDateString();
+  };
 
   // Filter orders based on date range
   const filterOrdersByDate = (orders: Order[]): Order[] => {
-    if (!fromDate && !toDate) return orders;
+    console.log('filterOrdersByDate called with:', { orders, fromDate, toDate });
+    if (!fromDate && !toDate) {
+      console.log('No date filters applied, returning all orders');
+      return orders;
+    }
     
-    return orders.filter(order => {
-      const orderDate = new Date(order.createdAt);
+    const filtered = orders.filter(order => {
+      // Use safe date conversion for order createdAt
+      let orderDate: Date;
+      if (order.createdAt instanceof Date) {
+        orderDate = order.createdAt;
+      } else {
+        orderDate = new Date(order.createdAt);
+      }
+      
+      // Check if orderDate is valid
+      if (isNaN(orderDate.getTime())) {
+        console.log('Invalid date for order:', order.id);
+        return false; // Skip invalid dates
+      }
+      
       const from = fromDate ? new Date(fromDate) : null;
       const to = toDate ? new Date(toDate) : null;
       
@@ -43,14 +87,63 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
         to.setHours(23, 59, 59, 999);
       }
       
-      return (
+      const result = (
         (!from || orderDate >= from) &&
         (!to || orderDate <= to)
       );
+      
+      console.log('Order date filter result for order', order.id, ':', result);
+      return result;
     });
+    
+    console.log('Filtered orders:', filtered);
+    return filtered;
   };
 
   const filteredOrders = filterOrdersByDate(orders);
+
+  // Debugging: Log orders to see the data structure
+  useEffect(() => {
+    console.log('Orders data:', orders);
+    if (orders.length > 0) {
+      console.log('First order:', orders[0]);
+      console.log('First order createdAt:', orders[0].createdAt);
+      console.log('Type of createdAt:', typeof orders[0].createdAt);
+      console.log('Is createdAt a Date?', orders[0].createdAt instanceof Date);
+      if (typeof orders[0].createdAt === 'string') {
+        console.log('Parsed date:', new Date(orders[0].createdAt));
+        console.log('Is parsed date valid?', !isNaN(new Date(orders[0].createdAt).getTime()));
+      }
+    }
+  }, [orders]);
+
+  // Handle return button click
+  const handleReturnClick = (order: Order) => {
+    setSelectedOrder(order);
+    setShowReturnOptions(true);
+    setReturnType(null);
+  };
+
+  // Handle return option selection
+  const handleReturnOptionSelect = (type: 'complete' | 'partial') => {
+    setReturnType(type);
+    
+    // If onReturnOrder is defined, call it with the order and return type
+    if (onReturnOrder && selectedOrder) {
+      console.log('Calling onReturnOrder with order:', selectedOrder, 'and type:', type);
+      onReturnOrder(selectedOrder, type);
+    }
+    
+    // Close the return options dialog
+    setShowReturnOptions(false);
+  };
+
+  // Close return options dialog
+  const closeReturnOptions = () => {
+    setShowReturnOptions(false);
+    setSelectedOrder(null);
+    setReturnType(null);
+  };
 
   // Report by Bill
   const ReportByBill = () => (
@@ -85,7 +178,7 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                     <tr key={order.id} className="border-b">
                       <td className="py-2">#{order.id.slice(-6)}</td>
                       <td className="py-2">
-                        {new Date(order.createdAt).toLocaleDateString()}
+                        {formatDate(order.createdAt)}
                       </td>
                       <td className="py-2">AED {order.total.toFixed(2)}</td>
                       <td className="py-2">
@@ -94,10 +187,12 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                         </Badge>
                       </td>
                       <td className="py-2">
-                        {order.paymentMethod === 'cash' ? 'AED ' + order.total.toFixed(2) : 'AED 0.00'}
+                        {order.paymentMethod === 'both' && order.cashAmount ? `AED ${order.cashAmount.toFixed(2)}` : 
+                         order.paymentMethod === 'cash' ? `AED ${order.total.toFixed(2)}` : 'AED 0.00'}
                       </td>
                       <td className="py-2">
-                        {order.paymentMethod === 'card' ? 'AED ' + order.total.toFixed(2) : 'AED 0.00'}
+                        {order.paymentMethod === 'both' && order.cardAmount ? `AED ${order.cardAmount.toFixed(2)}` : 
+                         order.paymentMethod === 'card' ? `AED ${order.total.toFixed(2)}` : 'AED 0.00'}
                       </td>
                       <td className="py-2">
                         <Badge variant={order.status === 'completed' ? 'default' : 'secondary'}>
@@ -113,7 +208,7 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => onReturnOrder && onReturnOrder(order)}
+                            onClick={() => handleReturnClick(order)}
                           >
                             <RotateCcw className="h-4 w-4 mr-1" />
                             Return
@@ -133,25 +228,38 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
 
   // Report by Item
   const ReportByItem = () => {
+    console.log('ReportByItem rendered with filteredOrders:', filteredOrders);
     // Aggregate items across filtered orders
     const itemSales: { [key: string]: { product: Product, quantity: number, revenue: number } } = {};
     
-    filteredOrders.forEach(order => {
-      order.items.forEach(item => {
-        if (itemSales[item.product.id]) {
-          itemSales[item.product.id].quantity += item.quantity;
-          itemSales[item.product.id].revenue += item.subtotal;
-        } else {
-          itemSales[item.product.id] = {
-            product: item.product,
-            quantity: item.quantity,
-            revenue: item.subtotal
-          };
-        }
-      });
+    filteredOrders.forEach((order, orderIndex) => {
+      console.log(`Processing order ${orderIndex}:`, order);
+      // Add safety check for order.items
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item, itemIndex) => {
+          console.log(`Processing item ${itemIndex} in order ${orderIndex}:`, item);
+          if (itemSales[item.product.id]) {
+            itemSales[item.product.id].quantity += item.quantity;
+            itemSales[item.product.id].revenue += item.subtotal;
+          } else {
+            itemSales[item.product.id] = {
+              product: item.product,
+              quantity: item.quantity,
+              revenue: item.subtotal
+            };
+          }
+        });
+      } else {
+        console.log(`Order ${orderIndex} has no valid items array`);
+      }
     });
 
     const items = Object.values(itemSales);
+    console.log('Aggregated items:', items);
+
+    // Calculate totals for the report
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalRevenue = items.reduce((sum, item) => sum + item.revenue, 0);
 
     return (
       <Card className="bg-card border-border">
@@ -166,6 +274,28 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
             <p className="text-muted-foreground text-center py-8">No items sold for selected date range</p>
           ) : (
             <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">Total Items</p>
+                    <p className="text-2xl font-bold">{items.length}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">Total Quantity Sold</p>
+                    <p className="text-2xl font-bold">{totalQuantity}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                    <p className="text-2xl font-bold">AED {totalRevenue.toFixed(2)}</p>
+                  </CardContent>
+                </Card>
+              </div>
+              
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -203,16 +333,19 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
     const dailySales: { [key: string]: { date: string, orders: number, revenue: number } } = {};
     
     filteredOrders.forEach(order => {
-      const date = new Date(order.createdAt).toLocaleDateString();
-      if (dailySales[date]) {
-        dailySales[date].orders += 1;
-        dailySales[date].revenue += order.total;
-      } else {
-        dailySales[date] = {
-          date,
-          orders: 1,
-          revenue: order.total
-        };
+      const dateStr = formatDate(order.createdAt);
+      // Skip invalid dates
+      if (dateStr !== 'Invalid Date') {
+        if (dailySales[dateStr]) {
+          dailySales[dateStr].orders += 1;
+          dailySales[dateStr].revenue += order.total;
+        } else {
+          dailySales[dateStr] = {
+            date: dateStr,
+            orders: 1,
+            revenue: order.total
+          };
+        }
       }
     });
 
@@ -295,10 +428,10 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                       <tr key={order.id} className="border-b">
                         <td className="py-2">#{order.id.slice(-6)}</td>
                         <td className="py-2">
-                          {new Date(order.createdAt).toLocaleDateString()}
+                          {formatDate(order.createdAt)}
                         </td>
-                        <td className="py-2">{order.customer.name}</td>
-                        <td className="py-2">{order.customer.address || 'N/A'}</td>
+                        <td className="py-2">{order.customer?.name || 'Unknown Customer'}</td>
+                        <td className="py-2">{order.customer?.address || 'N/A'}</td>
                         <td className="py-2">AED {order.total.toFixed(2)}</td>
                         <td className="py-2">
                           <Badge variant="secondary">
@@ -319,6 +452,33 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Return Options Dialog */}
+      {showReturnOptions && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Return Options</h3>
+            <p className="mb-4">Select return type for Order #{selectedOrder.id.slice(-6)}</p>
+            <div className="flex flex-col gap-3">
+              <Button 
+                variant={returnType === 'complete' ? 'default' : 'outline'} 
+                onClick={() => handleReturnOptionSelect('complete')}
+              >
+                Completely Return
+              </Button>
+              <Button 
+                variant={returnType === 'partial' ? 'default' : 'outline'} 
+                onClick={() => handleReturnOptionSelect('partial')}
+              >
+                Partially Return
+              </Button>
+              <Button variant="outline" onClick={closeReturnOptions}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Date Range Filter */}
       <Card className="bg-card border-border">
         <CardHeader>

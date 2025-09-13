@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS orders (
   tax DECIMAL(10, 2) NOT NULL DEFAULT 0,
   total DECIMAL(10, 2) NOT NULL,
   payment_method ENUM('cash', 'card', 'credit', 'both', 'cod') NOT NULL,
+  cash_amount DECIMAL(10, 2) DEFAULT NULL, -- Add cash amount for split payments
+  card_amount DECIMAL(10, 2) DEFAULT NULL, -- Add card amount for split payments
   status ENUM('completed', 'pending', 'cancelled') NOT NULL,
   delivery_status ENUM('pending', 'in-transit', 'delivered'),
   payment_status ENUM('paid', 'unpaid'),

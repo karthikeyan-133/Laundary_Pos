@@ -10,15 +10,18 @@ import { Order, CartItem } from '@/types/pos';
 
 interface ReturnByItemsProps {
   preselectedOrder?: Order | null;
+  returnType?: 'complete' | 'partial' | null;
 }
 
-export function ReturnByItems({ preselectedOrder }: ReturnByItemsProps) {
+export function ReturnByItems({ preselectedOrder, returnType }: ReturnByItemsProps) {
+  console.log('ReturnByItems rendered with preselectedOrder:', preselectedOrder, 'and returnType:', returnType);
   const { orders } = usePOSStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [selectedItems, setSelectedItems] = useState<Record<string, {item: CartItem, orderId: string, quantity: number}>>({});
   const [filteredOrders, setFilteredOrders] = useState<Order[]>(preselectedOrder ? [preselectedOrder] : orders);
+  const [preSelectionMessage, setPreSelectionMessage] = useState<string | null>(null);
 
   // Apply date range filter when dates change
   useEffect(() => {
@@ -51,34 +54,77 @@ export function ReturnByItems({ preselectedOrder }: ReturnByItemsProps) {
     setFilteredOrders(filtered);
   }, [fromDate, toDate, orders, preselectedOrder]);
 
-  // Handle preselected order
+  // Handle preselected order and return type
   useEffect(() => {
+    console.log('useEffect triggered with preselectedOrder:', preselectedOrder, 'returnType:', returnType);
     if (preselectedOrder) {
       // Set the preselected order as the only filtered order
       setFilteredOrders([preselectedOrder]);
       setFromDate('');
       setToDate('');
       setSearchTerm('');
+      setPreSelectionMessage(null);
+      
+      // If returnType is 'complete' or 'partial', pre-select items based on the return type
+      if (returnType === 'complete' || returnType === 'partial') {
+        console.log('Processing returnType:', returnType);
+        const initialSelectedItems: Record<string, {item: CartItem, orderId: string, quantity: number}> = {};
+        
+        // Add safety check for preselectedOrder.items
+        if (preselectedOrder.items && Array.isArray(preselectedOrder.items)) {
+          preselectedOrder.items.forEach(item => {
+            const key = `${preselectedOrder.id}-${item.id}`;
+            const quantity = returnType === 'complete' ? item.quantity : Math.floor(item.quantity / 2);
+            console.log(`Setting quantity for item ${item.id}:`, quantity);
+            
+            initialSelectedItems[key] = {
+              item,
+              orderId: preselectedOrder.id,
+              quantity
+            };
+          });
+        }
+        
+        setSelectedItems(initialSelectedItems);
+        console.log('Selected items set:', initialSelectedItems);
+        
+        // Show a notification to the user about pre-selection
+        const itemCount = Object.keys(initialSelectedItems).length;
+        const returnTypeName = returnType === 'complete' ? 'Completely Return' : 'Partially Return';
+        setPreSelectionMessage(`Pre-selected ${itemCount} items for ${returnTypeName}`);
+        
+        // Clear the message after 5 seconds
+        setTimeout(() => {
+          setPreSelectionMessage(null);
+        }, 5000);
+      }
     } else {
       // Reset to all orders when no preselected order
       setFilteredOrders(orders);
+      setPreSelectionMessage(null);
     }
-  }, [preselectedOrder, orders]);
+  }, [preselectedOrder, orders, returnType]); // Add returnType to dependency array
 
   // Flatten order items - if there's a preselected order, only show items from that order
   const allOrderItems: { item: CartItem; order: Order }[] = [];
   
   if (preselectedOrder) {
     // Only show items from the preselected order
-    preselectedOrder.items.forEach(item => {
-      allOrderItems.push({ item, order: preselectedOrder });
-    });
+    // Add safety check for preselectedOrder.items
+    if (preselectedOrder.items && Array.isArray(preselectedOrder.items)) {
+      preselectedOrder.items.forEach(item => {
+        allOrderItems.push({ item, order: preselectedOrder });
+      });
+    }
   } else {
     // Show items from all filtered orders
     filteredOrders.forEach(order => {
-      order.items.forEach(item => {
-        allOrderItems.push({ item, order });
-      });
+      // Add safety check for order.items
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach(item => {
+          allOrderItems.push({ item, order });
+        });
+      }
     });
   }
 
@@ -212,7 +258,7 @@ export function ReturnByItems({ preselectedOrder }: ReturnByItemsProps) {
               <div>
                 <h3 className="text-lg font-semibold">Returning Items from Order: {preselectedOrder.id.slice(-6)}</h3>
                 <p className="text-muted-foreground">
-                  Customer: {preselectedOrder.customer.name || 'N/A'} | 
+                  Customer: {preselectedOrder.customer?.name || 'N/A'} | 
                   Date: {new Date(preselectedOrder.createdAt).toLocaleDateString()}
                 </p>
               </div>
@@ -227,6 +273,24 @@ export function ReturnByItems({ preselectedOrder }: ReturnByItemsProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Pre-selection message */}
+      {preSelectionMessage && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Success! </strong>
+          <span className="block sm:inline">{preSelectionMessage}</span>
+        </div>
+      )}
+
+      {/* Return mode message */}
+      {preselectedOrder && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-blue-800">
+            <strong>Return Mode:</strong> Only items from Order #{preselectedOrder.id.slice(-6)} are shown. 
+            Select items to return and specify quantities.
+          </p>
+        </div>
       )}
 
       <Card>
@@ -250,15 +314,6 @@ export function ReturnByItems({ preselectedOrder }: ReturnByItemsProps) {
                     className="pl-10"
                   />
                 </div>
-              </div>
-            )}
-            
-            {preselectedOrder && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-blue-800">
-                  <strong>Return Mode:</strong> Only items from Order #{preselectedOrder.id.slice(-6)} are shown. 
-                  Select items to return and specify quantities.
-                </p>
               </div>
             )}
             
@@ -354,8 +409,7 @@ export function ReturnByItems({ preselectedOrder }: ReturnByItemsProps) {
                               <div className="text-sm text-gray-500">{item.product.sku}</div>
                             </div>
                           </TableCell>
-                          {!preselectedOrder && <TableCell>{orderId.slice(-6)}</TableCell>
-}
+                          {!preselectedOrder && <TableCell>{orderId.slice(-6)}</TableCell>}
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>{quantity}</TableCell>
                           <TableCell>AED {item.product.price.toFixed(2)}</TableCell>

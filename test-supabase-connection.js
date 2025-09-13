@@ -1,5 +1,5 @@
 // Test script to verify Supabase connection
-const supabase = require('./backend/supabaseClient');
+const supabase = require('./backend-new/supabaseClient');
 
 async function testConnection() {
   console.log('Testing Supabase connection...');

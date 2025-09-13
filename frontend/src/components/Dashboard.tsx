@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { TrendingUp, Users, DollarSign, ShoppingBag, Calendar, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,21 @@ interface DashboardProps {
 }
 
 export function Dashboard({ orders }: DashboardProps) {
+  // Debugging: Log orders to see the data structure
+  useEffect(() => {
+    console.log('Dashboard Orders data:', orders);
+    if (orders.length > 0) {
+      console.log('Dashboard First order:', orders[0]);
+      console.log('Dashboard First order createdAt:', orders[0].createdAt);
+      console.log('Dashboard Type of createdAt:', typeof orders[0].createdAt);
+      console.log('Dashboard Is createdAt a Date?', orders[0].createdAt instanceof Date);
+      if (typeof orders[0].createdAt === 'string') {
+        console.log('Dashboard Parsed date:', new Date(orders[0].createdAt));
+        console.log('Dashboard Is parsed date valid?', !isNaN(new Date(orders[0].createdAt).getTime()));
+      }
+    }
+  }, [orders]);
+
   const { 
     openingCash, 
     getTodayOrders, 
@@ -31,31 +46,53 @@ export function Dashboard({ orders }: DashboardProps) {
   const productSales: { [key: string]: { product: Product, quantity: number, revenue: number } } = {};
   
   orders.forEach(order => {
-    order.items.forEach(item => {
-      if (productSales[item.product.id]) {
-        productSales[item.product.id].quantity += item.quantity;
-        productSales[item.product.id].revenue += item.subtotal;
-      } else {
-        productSales[item.product.id] = {
-          product: item.product,
-          quantity: item.quantity,
-          revenue: item.subtotal
-        };
-      }
-    });
+    // Add safety check for order.items
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach(item => {
+        if (productSales[item.product.id]) {
+          productSales[item.product.id].quantity += item.quantity;
+          productSales[item.product.id].revenue += item.subtotal;
+        } else {
+          productSales[item.product.id] = {
+            product: item.product,
+            quantity: item.quantity,
+            revenue: item.subtotal
+          };
+        }
+      });
+    }
   });
 
   const topProducts = Object.values(productSales)
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string | undefined | null) => {
+    // Handle undefined, null, or empty values
+    if (!date) {
+      return 'Invalid Date';
+    }
+    
+    // If it's already a Date object, use it directly
+    let dateObj: Date;
+    if (date instanceof Date) {
+      dateObj = date;
+    } else {
+      // If it's a string, try to parse it
+      dateObj = new Date(date);
+    }
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid Date';
+    }
+    
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
-    }).format(date);
+    }).format(dateObj);
   };
 
   const getStatusBadgeVariant = (status: Order['status']) => {
@@ -176,10 +213,10 @@ export function Dashboard({ orders }: DashboardProps) {
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {order.customer.name} • {formatDate(new Date(order.createdAt))}
+                        {order.customer?.name || 'Unknown Customer'} • {formatDate(new Date(order.createdAt))}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {order.items.length} {order.items.length === 1 ? 'item' : 'items'} • {order.paymentMethod}
+                        {order.items && Array.isArray(order.items) ? order.items.length : 0} {order.items && Array.isArray(order.items) && order.items.length === 1 ? 'item' : 'items'} • {order.paymentMethod}
                       </p>
                     </div>
                     <div className="text-right">
