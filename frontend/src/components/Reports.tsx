@@ -453,17 +453,27 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
 
   // Report by Item
   const ReportByItem = () => {
-    // Always process all orders for item reporting, regardless of date filters
-    // This ensures we always show item data even if date filters exclude all orders
-    const ordersToProcess = filteredOrders.length > 0 ? filteredOrders : orders;
+    // Use filtered orders for consistency with other reports
+    const ordersToProcess = filteredOrders;
     
     console.log('ReportByItem processing orders:', ordersToProcess.length);
     console.log('Original orders:', orders.length);
     console.log('Filtered orders:', filteredOrders.length);
     
-    // Aggregate items across all orders
-    const itemSales: { [key: string]: { product: Product, quantity: number, revenue: number } } = {};
-    
+    // Create a list of individual item details from all orders
+    const itemDetails: { 
+      orderDate: string;
+      orderId: string;
+      productName: string;
+      categoryName: string;
+      quantity: number;
+      price: number;
+      subtotal: number;
+      customerName: string;
+      paymentMethod: string;
+      status: string;
+    }[] = [];
+
     ordersToProcess.forEach((order, orderIndex) => {
       console.log(`Processing order ${orderIndex + 1}:`, order.id);
       
@@ -496,95 +506,59 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
           return;
         }
         
-        // Check if item has product property
-        if (!item.hasOwnProperty('product')) {
+        // Check if item has product property (could be 'product' or 'products')
+        let product = item.product;
+        // Handle case where backend returns 'products' instead of 'product'
+        if (!product && (item as any).products) {
+          product = (item as any).products;
+        }
+        
+        // Check if product exists
+        if (!product) {
           console.log('Item has no product property');
           console.log('Item keys:', Object.keys(item));
           return;
         }
         
-        // Check if product has id
-        if (!item.product || !item.product.id) {
-          console.log('Product has no id');
-          console.log('Product:', item.product);
-          return;
+        // Convert string values to numbers if needed
+        const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
+        const subtotal = typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal;
+        const price = product.price || 0;
+        
+        // Format order date
+        let orderDate = '';
+        try {
+          if (order.createdAt instanceof Date) {
+            orderDate = order.createdAt.toLocaleString();
+          } else if (typeof order.createdAt === 'string') {
+            const dateObj = new Date(order.createdAt);
+            if (!isNaN(dateObj.getTime())) {
+              orderDate = dateObj.toLocaleString();
+            }
+          }
+        } catch (error) {
+          console.error('Error formatting order date:', error);
         }
         
-        // Check if quantity and subtotal exist
-        if (typeof item.quantity !== 'number' || typeof item.subtotal !== 'number') {
-          console.log('Item quantity or subtotal is not a number');
-          console.log('Quantity:', item.quantity, 'Type:', typeof item.quantity);
-          console.log('Subtotal:', item.subtotal, 'Type:', typeof item.subtotal);
-          return;
-        }
-        
-        console.log('Valid item with product id:', item.product.id);
-        
-        if (itemSales[item.product.id]) {
-          console.log(`Updating existing item ${item.product.id}`, {
-            oldQuantity: itemSales[item.product.id].quantity,
-            addQuantity: item.quantity,
-            newQuantity: itemSales[item.product.id].quantity + item.quantity,
-            oldRevenue: itemSales[item.product.id].revenue,
-            addRevenue: item.subtotal,
-            newRevenue: itemSales[item.product.id].revenue + item.subtotal
-          });
-          itemSales[item.product.id].quantity += item.quantity;
-          itemSales[item.product.id].revenue += item.subtotal;
-        } else {
-          console.log(`Adding new item ${item.product.id}`, {
-            product: item.product,
-            quantity: item.quantity,
-            revenue: item.subtotal
-          });
-          itemSales[item.product.id] = {
-            product: item.product,
-            quantity: item.quantity,
-            revenue: item.subtotal
-          };
-        }
+        // Add item details to the list
+        itemDetails.push({
+          orderDate: orderDate,
+          orderId: order.id,
+          productName: product.name || '',
+          categoryName: product.category || '',
+          quantity: quantity,
+          price: price,
+          subtotal: subtotal,
+          customerName: order.customer?.name || 'N/A',
+          paymentMethod: order.paymentMethod || '',
+          status: order.status || ''
+        });
       });
     });
 
-    const items = Object.values(itemSales);
-    console.log('Aggregated items count:', items.length);
-    if (items.length > 0) {
-      console.log('First aggregated item:', items[0]);
-    }
-
-    // Calculate totals for the report
-    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalRevenue = items.reduce((sum, item) => sum + item.revenue, 0);
-
-    // Fallback: if no items aggregated but we have orders with items, create a simple list
-    let displayItems = items;
-    if (items.length === 0 && ordersToProcess.length > 0) {
-      console.log('Creating fallback item list');
-      const fallbackItems: { product: Product, quantity: number, revenue: number }[] = [];
-      
-      ordersToProcess.forEach(order => {
-        if (order.items && Array.isArray(order.items)) {
-          order.items.forEach(item => {
-            if (item && item.product) {
-              // Check if we already have this product in fallback list
-              const existingItem = fallbackItems.find(i => i.product.id === item.product.id);
-              if (existingItem) {
-                existingItem.quantity += item.quantity;
-                existingItem.revenue += item.subtotal;
-              } else {
-                fallbackItems.push({
-                  product: item.product,
-                  quantity: item.quantity,
-                  revenue: item.subtotal
-                });
-              }
-            }
-          });
-        }
-      });
-      
-      displayItems = fallbackItems;
-      console.log('Fallback items count:', displayItems.length);
+    console.log('Item details count:', itemDetails.length);
+    if (itemDetails.length > 0) {
+      console.log('First item detail:', itemDetails[0]);
     }
 
     return (
@@ -596,53 +570,41 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {displayItems.length === 0 ? (
+          {itemDetails.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
               No items sold yet
             </p>
           ) : (
             <div className="space-y-4">
-              {/* Summary cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">Total Items</p>
-                    <p className="text-2xl font-bold">{displayItems.length}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">Total Quantity Sold</p>
-                    <p className="text-2xl font-bold">{displayItems.reduce((sum, item) => sum + item.quantity, 0)}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">Total Revenue</p>
-                    <p className="text-2xl font-bold">AED {displayItems.reduce((sum, item) => sum + item.revenue, 0).toFixed(2)}</p>
-                  </CardContent>
-                </Card>
-              </div>
-              
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
+                      <th className="text-left py-2">Order ID</th>
+                      <th className="text-left py-2">Date</th>
                       <th className="text-left py-2">Item Name</th>
                       <th className="text-left py-2">Category</th>
-                      <th className="text-left py-2">Quantity Sold</th>
-                      <th className="text-left py-2">Revenue</th>
-                      <th className="text-left py-2">Avg. Price</th>
+                      <th className="text-left py-2">Quantity</th>
+                      <th className="text-left py-2">Price</th>
+                      <th className="text-left py-2">Subtotal</th>
+                      <th className="text-left py-2">Customer</th>
+                      <th className="text-left py-2">Payment</th>
+                      <th className="text-left py-2">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {displayItems.map((item, index) => (
-                      <tr key={item.product.id || index} className="border-b">
-                        <td className="py-2">{item.product.name}</td>
-                        <td className="py-2">{item.product.category}</td>
+                    {itemDetails.map((item, index) => (
+                      <tr key={`${item.orderId}-${index}`} className="border-b">
+                        <td className="py-2">#{item.orderId.slice(-6)}</td>
+                        <td className="py-2">{item.orderDate}</td>
+                        <td className="py-2">{item.productName}</td>
+                        <td className="py-2">{item.categoryName}</td>
                         <td className="py-2">{item.quantity}</td>
-                        <td className="py-2">AED {item.revenue.toFixed(2)}</td>
-                        <td className="py-2">AED {(item.revenue / item.quantity).toFixed(2)}</td>
+                        <td className="py-2">AED {item.price.toFixed(2)}</td>
+                        <td className="py-2">AED {item.subtotal.toFixed(2)}</td>
+                        <td className="py-2">{item.customerName}</td>
+                        <td className="py-2">{item.paymentMethod}</td>
+                        <td className="py-2">{item.status}</td>
                       </tr>
                     ))}
                   </tbody>

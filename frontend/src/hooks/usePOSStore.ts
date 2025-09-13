@@ -117,9 +117,16 @@ const convertOrderDataTypes = (order: any): Order => {
   // Process items
   const items = order.items && Array.isArray(order.items) ? order.items.map((item: any) => {
     console.log('Processing item:', item);
+    
+    // Handle both 'product' and 'products' properties from backend
+    let product = item.product;
+    if (!product && item.products) {
+      product = item.products;
+    }
+    
     const processedItem = {
       ...item,
-      product: convertProductDataTypes(item.product),
+      product: convertProductDataTypes(product),
       subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal,
       discount: typeof item.discount === 'string' ? parseFloat(item.discount) : item.discount
     };
