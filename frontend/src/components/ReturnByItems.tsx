@@ -15,13 +15,14 @@ interface ReturnByItemsProps {
 
 export function ReturnByItems({ preselectedOrder, returnType }: ReturnByItemsProps) {
   console.log('ReturnByItems rendered with preselectedOrder:', preselectedOrder, 'and returnType:', returnType);
-  const { orders } = usePOSStore();
+  const { orders, processReturn } = usePOSStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [selectedItems, setSelectedItems] = useState<Record<string, {item: CartItem, orderId: string, quantity: number}>>({});
   const [filteredOrders, setFilteredOrders] = useState<Order[]>(preselectedOrder ? [preselectedOrder] : orders);
   const [preSelectionMessage, setPreSelectionMessage] = useState<string | null>(null);
+  const [returnReason, setReturnReason] = useState<string>('');
 
   // Apply date range filter when dates change
   useEffect(() => {
@@ -177,7 +178,7 @@ export function ReturnByItems({ preselectedOrder, returnType }: ReturnByItemsPro
     }, 0);
   };
 
-  const handleProcessReturn = () => {
+  const handleProcessReturn = async () => {
     if (Object.keys(selectedItems).length === 0) return;
     
     // Group items by order
@@ -189,13 +190,16 @@ export function ReturnByItems({ preselectedOrder, returnType }: ReturnByItemsPro
       itemsByOrder[orderId].push({ item, quantity });
     });
     
-    // In a real application, this would process the return
-    console.log('Processing return by items:', itemsByOrder);
+    // Process return for each order
+    for (const [orderId, items] of Object.entries(itemsByOrder)) {
+      await processReturn(orderId, items, returnReason);
+    }
     
     alert(`Return processed for ${Object.keys(selectedItems).length} items. Total refund: AED ${calculateTotalReturn().toFixed(2)}`);
     
     // Reset selection
     setSelectedItems({});
+    setReturnReason('');
   };
 
   const isItemSelected = (itemId: string, orderId: string) => {
@@ -291,6 +295,23 @@ export function ReturnByItems({ preselectedOrder, returnType }: ReturnByItemsPro
             Select items to return and specify quantities.
           </p>
         </div>
+      )}
+
+      {/* Return reason input */}
+      {Object.keys(selectedItems).length > 0 && (
+        <Card>
+          <CardContent className="pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="return-reason">Return Reason</Label>
+              <Input
+                id="return-reason"
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                placeholder="Enter reason for return (optional)"
+              />
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <Card>

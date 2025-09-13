@@ -15,14 +15,15 @@ import {
   Printer,
   RotateCcw
 } from 'lucide-react';
-import { Order, Product } from '@/types/pos';
+import { Order, Product, POSSettings } from '@/types/pos';
 
 interface ReportsProps {
   orders: Order[];
   onReturnOrder?: (order: Order, type: 'complete' | 'partial' | null) => void;
+  settings?: POSSettings; // Add settings prop for business info
 }
 
-export function Reports({ orders, onReturnOrder }: ReportsProps) {
+export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
   const [activeReport, setActiveReport] = useState<
     'bill' | 'item' | 'daily' | 'delivery'
   >('bill');
@@ -59,48 +60,88 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
   // Filter orders based on date range
   const filterOrdersByDate = (orders: Order[]): Order[] => {
     console.log('filterOrdersByDate called with:', { orders, fromDate, toDate });
-    if (!fromDate && !toDate) {
+    console.log('Filter dates - From:', fromDate, 'To:', toDate);
+    
+    // If no date filters are set, return all orders
+    if ((!fromDate || fromDate === '') && (!toDate || toDate === '')) {
       console.log('No date filters applied, returning all orders');
       return orders;
     }
     
     const filtered = orders.filter(order => {
-      // Use safe date conversion for order createdAt
-      let orderDate: Date;
-      if (order.createdAt instanceof Date) {
-        orderDate = order.createdAt;
-      } else {
-        orderDate = new Date(order.createdAt);
+      try {
+        // Convert order createdAt to Date object if it's not already
+        let orderDate: Date;
+        if (order.createdAt instanceof Date) {
+          orderDate = order.createdAt;
+        } else if (typeof order.createdAt === 'string') {
+          orderDate = new Date(order.createdAt);
+        } else {
+          console.log('Invalid date type for order:', order.id, typeof order.createdAt);
+          return false;
+        }
+        
+        // Check if orderDate is valid
+        if (isNaN(orderDate.getTime())) {
+          console.log('Invalid date for order:', order.id, order.createdAt);
+          return false;
+        }
+        
+        console.log('Order date for', order.id, ':', orderDate);
+        
+        // Parse filter dates
+        const from = fromDate ? new Date(fromDate) : null;
+        const to = toDate ? new Date(toDate) : null;
+        
+        console.log('Filter dates - From:', from, 'To:', to);
+        
+        // Set time to end of day for toDate comparison
+        if (to) {
+          to.setHours(23, 59, 59, 999);
+        }
+        
+        // Check if order date is within the filter range
+        const isAfterFrom = !from || orderDate >= from;
+        const isBeforeTo = !to || orderDate <= to;
+        
+        console.log(`Order ${order.id} - Date: ${orderDate}, From: ${from}, To: ${to}, AfterFrom: ${isAfterFrom}, BeforeTo: ${isBeforeTo}`);
+        
+        return isAfterFrom && isBeforeTo;
+      } catch (error) {
+        console.error('Error filtering order:', order.id, error);
+        return false;
       }
-      
-      // Check if orderDate is valid
-      if (isNaN(orderDate.getTime())) {
-        console.log('Invalid date for order:', order.id);
-        return false; // Skip invalid dates
-      }
-      
-      const from = fromDate ? new Date(fromDate) : null;
-      const to = toDate ? new Date(toDate) : null;
-      
-      // Set time to end of day for toDate comparison
-      if (to) {
-        to.setHours(23, 59, 59, 999);
-      }
-      
-      const result = (
-        (!from || orderDate >= from) &&
-        (!to || orderDate <= to)
-      );
-      
-      console.log('Order date filter result for order', order.id, ':', result);
-      return result;
     });
     
-    console.log('Filtered orders:', filtered);
+    console.log('Filtering complete. Original count:', orders.length, 'Filtered count:', filtered.length);
     return filtered;
   };
 
   const filteredOrders = filterOrdersByDate(orders);
+  console.log('Filtered orders length:', filteredOrders.length);
+  console.log('Original orders length:', orders.length);
+  
+  // Add a check to see if all orders are being filtered out
+  if (filteredOrders.length === 0 && orders.length > 0) {
+    console.log('WARNING: All orders filtered out. Check date filtering logic.');
+  }
+  
+  // Check if we have any orders at all
+  if (orders.length === 0) {
+    console.log('No orders available in the system');
+  }
+  
+  // Debug orders data structure
+  if (orders.length > 0) {
+    console.log('First order structure:', {
+      id: orders[0].id,
+      hasItems: orders[0].hasOwnProperty('items'),
+      itemsType: typeof orders[0].items,
+      isArray: Array.isArray(orders[0].items),
+      itemsLength: orders[0].items ? orders[0].items.length : 0,
+      firstItem: orders[0].items && orders[0].items.length > 0 ? orders[0].items[0] : null
+    });
+  }
 
   // Debugging: Log orders to see the data structure
   useEffect(() => {
@@ -108,13 +149,30 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
     if (orders.length > 0) {
       console.log('First order:', orders[0]);
       console.log('First order createdAt:', orders[0].createdAt);
+      console.log('First order items:', orders[0].items);
+      console.log('First order items type:', typeof orders[0].items);
+      console.log('First order items is array:', Array.isArray(orders[0].items));
+      
+      if (orders[0].items && Array.isArray(orders[0].items) && orders[0].items.length > 0) {
+        console.log('First item in first order:', orders[0].items[0]);
+        console.log('First item product:', orders[0].items[0].product);
+        console.log('First item product id:', orders[0].items[0].product?.id);
+      }
+      
       console.log('Type of createdAt:', typeof orders[0].createdAt);
       console.log('Is createdAt a Date?', orders[0].createdAt instanceof Date);
       if (typeof orders[0].createdAt === 'string') {
-        console.log('Parsed date:', new Date(orders[0].createdAt));
-        console.log('Is parsed date valid?', !isNaN(new Date(orders[0].createdAt).getTime()));
+        const parsedDate = new Date(orders[0].createdAt);
+        console.log('Parsed date:', parsedDate);
+        console.log('Is parsed date valid?', !isNaN(parsedDate.getTime()));
       }
     }
+    
+    // Log all order dates for debugging
+    orders.forEach((order, index) => {
+      const orderDate = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt);
+      console.log(`Order ${index + 1} (${order.id}) date:`, orderDate, 'Valid:', !isNaN(orderDate.getTime()));
+    });
   }, [orders]);
 
   // Handle return button click
@@ -143,6 +201,169 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
     setShowReturnOptions(false);
     setSelectedOrder(null);
     setReturnType(null);
+  };
+
+  // Add generateReceipt function for printing
+  const generateReceipt = (order: Order) => {
+    if (!settings) {
+      console.error('Settings not provided for receipt generation');
+      return;
+    }
+
+    const receiptContent = `
+      <html>
+        <head>
+          <title>Receipt - ${order.id}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 10px;
+              width: 4in; /* 4 inch width */
+              max-width: 4in;
+            }
+            .receipt-header { 
+              text-align: center; 
+              margin-bottom: 10px; 
+            }
+            .receipt-title { 
+              font-size: 18px; 
+              font-weight: bold; 
+              margin-bottom: 5px;
+            }
+            .receipt-info { 
+              margin-bottom: 10px; 
+              font-size: 12px;
+            }
+            .receipt-items { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 10px; 
+              font-size: 12px;
+            }
+            .receipt-items th, .receipt-items td { 
+              padding: 4px 2px; 
+              text-align: left; 
+            }
+            .receipt-items th { 
+              border-bottom: 1px solid #000;
+              font-size: 12px;
+            }
+            .receipt-totals { 
+              width: 100%; 
+              border-collapse: collapse; 
+              font-size: 12px;
+            }
+            .receipt-totals td { 
+              padding: 2px; 
+              text-align: right; 
+            }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .mb-5 { margin-bottom: 5px; }
+            .mt-10 { margin-top: 10px; }
+            .divider { 
+              border-top: 1px dashed #000; 
+              margin: 5px 0; 
+            }
+            .item-name {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              max-width: 80px;
+            }
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 3px;
+            }
+            .item-details {
+              flex: 1;
+            }
+            .item-amount {
+              text-align: right;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-header">
+            <div class="receipt-title">${settings.businessName}</div>
+            <div style="font-size: 12px;">${settings.businessAddress}</div>
+            <div style="font-size: 12px;">Phone: ${settings.businessPhone}</div>
+            <div class="divider"></div>
+            <div><strong>RECEIPT</strong></div>
+          </div>
+          
+          <div class="receipt-info">
+            <div>Order ID: ${order.id}</div>
+            <div>Date: ${new Date(order.createdAt).toLocaleString()}</div>
+            <div>Customer: ${order.customer?.name || 'N/A'}</div>
+            <div>Payment: ${order.paymentMethod}</div>
+          </div>
+          
+          <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
+            <strong>Items:</strong>
+          </div>
+          
+          <div>
+            ${order.items.map(item => `
+              <div class="item-row">
+                <div class="item-details">
+                  <div class="item-name">${item.product.name}</div>
+                  <div>${item.quantity} × ${settings.currency}${item.product.price.toFixed(2)}</div>
+                </div>
+                <div class="item-amount">${settings.currency}${item.subtotal.toFixed(2)}</div>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div>
+            <div class="item-row">
+              <div>Subtotal:</div>
+              <div>${settings.currency}${order.subtotal.toFixed(2)}</div>
+            </div>
+            ${order.discount > 0 ? `
+            <div class="item-row">
+              <div>Discount:</div>
+              <div>-${settings.currency}${order.discount.toFixed(2)}</div>
+            </div>
+            ` : ''}
+            <div class="item-row">
+              <div>Tax (${settings.taxRate}%):</div>
+              <div>${settings.currency}${order.tax.toFixed(2)}</div>
+            </div>
+            <div class="divider"></div>
+            <div class="item-row" style="font-weight: bold; font-size: 14px;">
+              <div>Total:</div>
+              <div>${settings.currency}${order.total.toFixed(2)}</div>
+            </div>
+          </div>
+          
+          <div class="text-center mt-10" style="font-size: 12px;">
+            <p>Thank you for your purchase!</p>
+            <p>Please visit again</p>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              // Close window after printing
+              window.onfocus = function() { 
+                setTimeout(function() { window.close(); }, 500); 
+              }
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (printWindow) {
+      printWindow.document.write(receiptContent);
+      printWindow.document.close();
+    }
   };
 
   // Report by Bill
@@ -201,7 +422,11 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                       </td>
                       <td className="py-2">
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => generateReceipt(order)}
+                          >
                             <Printer className="h-4 w-4 mr-1" />
                             Print
                           </Button>
@@ -228,38 +453,139 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
 
   // Report by Item
   const ReportByItem = () => {
-    console.log('ReportByItem rendered with filteredOrders:', filteredOrders);
-    // Aggregate items across filtered orders
+    // Always process all orders for item reporting, regardless of date filters
+    // This ensures we always show item data even if date filters exclude all orders
+    const ordersToProcess = filteredOrders.length > 0 ? filteredOrders : orders;
+    
+    console.log('ReportByItem processing orders:', ordersToProcess.length);
+    console.log('Original orders:', orders.length);
+    console.log('Filtered orders:', filteredOrders.length);
+    
+    // Aggregate items across all orders
     const itemSales: { [key: string]: { product: Product, quantity: number, revenue: number } } = {};
     
-    filteredOrders.forEach((order, orderIndex) => {
-      console.log(`Processing order ${orderIndex}:`, order);
-      // Add safety check for order.items
-      if (order.items && Array.isArray(order.items)) {
-        order.items.forEach((item, itemIndex) => {
-          console.log(`Processing item ${itemIndex} in order ${orderIndex}:`, item);
-          if (itemSales[item.product.id]) {
-            itemSales[item.product.id].quantity += item.quantity;
-            itemSales[item.product.id].revenue += item.subtotal;
-          } else {
-            itemSales[item.product.id] = {
-              product: item.product,
-              quantity: item.quantity,
-              revenue: item.subtotal
-            };
-          }
-        });
-      } else {
-        console.log(`Order ${orderIndex} has no valid items array`);
+    ordersToProcess.forEach((order, orderIndex) => {
+      console.log(`Processing order ${orderIndex + 1}:`, order.id);
+      
+      // Check if order has items property
+      if (!order.hasOwnProperty('items')) {
+        console.log('Order has no items property');
+        return;
       }
+      
+      // Check if items is an array
+      if (!Array.isArray(order.items)) {
+        console.log('Order items is not an array:', typeof order.items);
+        console.log('Order items value:', order.items);
+        return;
+      }
+      
+      console.log('Order items count:', order.items.length);
+      
+      if (order.items.length === 0) {
+        console.log('Order has no items');
+        return;
+      }
+      
+      order.items.forEach((item, itemIndex) => {
+        console.log(`Processing item ${itemIndex + 1}:`, item);
+        
+        // Check if item exists
+        if (!item) {
+          console.log('Item is null or undefined');
+          return;
+        }
+        
+        // Check if item has product property
+        if (!item.hasOwnProperty('product')) {
+          console.log('Item has no product property');
+          console.log('Item keys:', Object.keys(item));
+          return;
+        }
+        
+        // Check if product has id
+        if (!item.product || !item.product.id) {
+          console.log('Product has no id');
+          console.log('Product:', item.product);
+          return;
+        }
+        
+        // Check if quantity and subtotal exist
+        if (typeof item.quantity !== 'number' || typeof item.subtotal !== 'number') {
+          console.log('Item quantity or subtotal is not a number');
+          console.log('Quantity:', item.quantity, 'Type:', typeof item.quantity);
+          console.log('Subtotal:', item.subtotal, 'Type:', typeof item.subtotal);
+          return;
+        }
+        
+        console.log('Valid item with product id:', item.product.id);
+        
+        if (itemSales[item.product.id]) {
+          console.log(`Updating existing item ${item.product.id}`, {
+            oldQuantity: itemSales[item.product.id].quantity,
+            addQuantity: item.quantity,
+            newQuantity: itemSales[item.product.id].quantity + item.quantity,
+            oldRevenue: itemSales[item.product.id].revenue,
+            addRevenue: item.subtotal,
+            newRevenue: itemSales[item.product.id].revenue + item.subtotal
+          });
+          itemSales[item.product.id].quantity += item.quantity;
+          itemSales[item.product.id].revenue += item.subtotal;
+        } else {
+          console.log(`Adding new item ${item.product.id}`, {
+            product: item.product,
+            quantity: item.quantity,
+            revenue: item.subtotal
+          });
+          itemSales[item.product.id] = {
+            product: item.product,
+            quantity: item.quantity,
+            revenue: item.subtotal
+          };
+        }
+      });
     });
 
     const items = Object.values(itemSales);
-    console.log('Aggregated items:', items);
+    console.log('Aggregated items count:', items.length);
+    if (items.length > 0) {
+      console.log('First aggregated item:', items[0]);
+    }
 
     // Calculate totals for the report
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
     const totalRevenue = items.reduce((sum, item) => sum + item.revenue, 0);
+
+    // Fallback: if no items aggregated but we have orders with items, create a simple list
+    let displayItems = items;
+    if (items.length === 0 && ordersToProcess.length > 0) {
+      console.log('Creating fallback item list');
+      const fallbackItems: { product: Product, quantity: number, revenue: number }[] = [];
+      
+      ordersToProcess.forEach(order => {
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach(item => {
+            if (item && item.product) {
+              // Check if we already have this product in fallback list
+              const existingItem = fallbackItems.find(i => i.product.id === item.product.id);
+              if (existingItem) {
+                existingItem.quantity += item.quantity;
+                existingItem.revenue += item.subtotal;
+              } else {
+                fallbackItems.push({
+                  product: item.product,
+                  quantity: item.quantity,
+                  revenue: item.subtotal
+                });
+              }
+            }
+          });
+        }
+      });
+      
+      displayItems = fallbackItems;
+      console.log('Fallback items count:', displayItems.length);
+    }
 
     return (
       <Card className="bg-card border-border">
@@ -270,8 +596,10 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No items sold for selected date range</p>
+          {displayItems.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              No items sold yet
+            </p>
           ) : (
             <div className="space-y-4">
               {/* Summary cards */}
@@ -279,19 +607,19 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                 <Card>
                   <CardContent className="p-4">
                     <p className="text-sm text-muted-foreground">Total Items</p>
-                    <p className="text-2xl font-bold">{items.length}</p>
+                    <p className="text-2xl font-bold">{displayItems.length}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
                     <p className="text-sm text-muted-foreground">Total Quantity Sold</p>
-                    <p className="text-2xl font-bold">{totalQuantity}</p>
+                    <p className="text-2xl font-bold">{displayItems.reduce((sum, item) => sum + item.quantity, 0)}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
                     <p className="text-sm text-muted-foreground">Total Revenue</p>
-                    <p className="text-2xl font-bold">AED {totalRevenue.toFixed(2)}</p>
+                    <p className="text-2xl font-bold">AED {displayItems.reduce((sum, item) => sum + item.revenue, 0).toFixed(2)}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -308,8 +636,8 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item) => (
-                      <tr key={item.product.id} className="border-b">
+                    {displayItems.map((item, index) => (
+                      <tr key={item.product.id || index} className="border-b">
                         <td className="py-2">{item.product.name}</td>
                         <td className="py-2">{item.product.category}</td>
                         <td className="py-2">{item.quantity}</td>
@@ -431,7 +759,7 @@ export function Reports({ orders, onReturnOrder }: ReportsProps) {
                           {formatDate(order.createdAt)}
                         </td>
                         <td className="py-2">{order.customer?.name || 'Unknown Customer'}</td>
-                        <td className="py-2">{order.customer?.address || 'N/A'}</td>
+                        <td className="py-2">{[order.customer?.place, order.customer?.emirate].filter(Boolean).join(', ') || 'N/A'}</td>
                         <td className="py-2">AED {order.total.toFixed(2)}</td>
                         <td className="py-2">
                           <Badge variant="secondary">

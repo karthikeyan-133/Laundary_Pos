@@ -15,6 +15,11 @@ if (!isVercel) {
 // Import Supabase client
 const supabase = require('./supabaseClient');
 
+// Import returns router
+const returnsRouter = require('./returns');
+
+console.log('Returns router loaded:', !!returnsRouter);
+
 const app = express();
 
 // Use Vercel's PORT or default to 3001
@@ -47,6 +52,10 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Use returns router (moved after middleware)
+app.use('/api/returns', returnsRouter);
+console.log('Returns router mounted at /api/returns');
 
 // Routes
 app.get('/', (req, res) => {
@@ -287,7 +296,7 @@ app.post('/api/customers', async (req, res) => {
 app.get('/api/orders', async (req, res) => {
   try {
     // Get orders with customer information
-    const { data, error } = await supabase
+    const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select(`
         *,
@@ -295,12 +304,36 @@ app.get('/api/orders', async (req, res) => {
       `)
       .order('created_at', { ascending: false });
     
-    if (error) {
-      console.error('Error fetching orders:', error);
+    if (ordersError) {
+      console.error('Error fetching orders:', ordersError);
       return res.status(500).json({ error: 'Failed to fetch orders' });
     }
     
-    res.json(data);
+    // For each order, get its items with product information
+    const ordersWithItems = await Promise.all(orders.map(async (order) => {
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          products(name, sku, price, category, stock, description, barcode)
+        `)
+        .eq('order_id', order.id);
+      
+      if (itemsError) {
+        console.error('Error fetching order items for order', order.id, ':', itemsError);
+        return { ...order, items: [] };
+      }
+      
+      // Convert products to product to match frontend expectations
+      const itemsWithProduct = items.map(item => ({
+        ...item,
+        product: item.products // Rename products to product
+      })).map(({ products, ...rest }) => rest); // Remove the products field
+      
+      return { ...order, items: itemsWithProduct };
+    }));
+    
+    res.json(ordersWithItems);
   } catch (err) {
     console.error('Error fetching orders:', err);
     return res.status(500).json({ error: 'Failed to fetch orders' });

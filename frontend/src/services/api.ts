@@ -14,17 +14,17 @@ const getApiBaseUrl = () => {
       return '';
     } else {
       // For local development
-      return 'http://localhost:3001';
+      return 'http://localhost:3002';
     }
   }
   // For server-side rendering, fallback to localhost
-  return 'http://localhost:3001';
+  return 'http://localhost:3002';
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
 // Helper function for API requests
-async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   // Ensure endpoint starts with /api
   const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
   const url = `${API_BASE_URL}${normalizedEndpoint}`;
@@ -81,7 +81,11 @@ export const customersApi = {
 
 // Orders API
 export const ordersApi = {
-  getAll: () => apiRequest<Order[]>('/orders'),
+  getAll: async () => {
+    const orders = await apiRequest<Order[]>('/orders');
+    console.log('Orders API response:', orders);
+    return orders;
+  },
   getById: (id: string) => apiRequest<Order>(`/orders/${id}`),
   create: (order: Omit<Order, 'id'>) => apiRequest<Order>('/orders', {
     method: 'POST',

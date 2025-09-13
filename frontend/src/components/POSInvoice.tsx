@@ -39,8 +39,8 @@ interface POSInvoiceProps {
   onUpdateDiscount: (itemId: string, discount: number) => void;
   onRemoveItem: (itemId: string) => void;
   onCustomerChange: (customer: Customer) => void;
-  onAddCustomer: (customer: Customer) => Customer;
-  onCheckout: (paymentMethod: Order['paymentMethod'], cashAmount?: number, cardAmount?: number) => Order | null;
+  onAddCustomer: (customer: Omit<Customer, 'id'>) => Promise<Customer>; // Updated to async
+  onCheckout: (paymentMethod: Order['paymentMethod'], cashAmount?: number, cardAmount?: number) => Promise<Order | null>; // Updated to async
   onClearCart: () => void;
   onSetCartDiscount: (type: 'flat' | 'percentage', value: number) => void;
   onHoldCart: () => string | null;
@@ -88,69 +88,84 @@ export function POSInvoice({
     setTempDiscountValue(cartDiscount.value.toString());
   }, [cartDiscount]);
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     // If "both" payment method is selected, show split payment popup
     if (paymentMethod === 'both') {
       setShowSplitPaymentPopup(true);
       return;
     }
     
-    const order = onCheckout(paymentMethod);
+    const order = await onCheckout(paymentMethod);
     if (order) {
       setPaymentMethod('cash');
       toast({
         title: "Checkout Successful",
         description: "Order has been processed successfully."
       });
+      
+      // Show success message without automatic printing
+      console.log("Checkout completed. Invoice available for printing from report page.");
     }
   };
 
   // Handle split payment confirmation
-  const handleSplitPaymentConfirm = (cashAmount: number, cardAmount: number) => {
+  const handleSplitPaymentConfirm = async (cashAmount: number, cardAmount: number) => {
     setShowSplitPaymentPopup(false);
     
-    // Pass the cash and card amounts to the checkout function
-    const order = onCheckout('both', cashAmount, cardAmount);
+    const order = await onCheckout('both', cashAmount, cardAmount);
     if (order) {
-      setPaymentMethod('cash');
       toast({
         title: "Checkout Successful",
-        description: `Order processed with ${settings.currency} ${cashAmount.toFixed(2)} cash and ${settings.currency} ${cardAmount.toFixed(2)} card.`
+        description: "Order has been processed successfully."
+      });
+      
+      // Show success message without automatic printing
+      console.log("Checkout completed. Invoice available for printing from report page.");
+    }
+  };
+
+  const handleAddCustomer = async (newCustomer: Omit<Customer, 'id'>) => {
+    try {
+      const customer = await onAddCustomer(newCustomer);
+      onCustomerChange(customer);
+      setShowCustomerPopup(false);
+      toast({
+        title: "Customer Added",
+        description: "New customer has been added successfully."
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add customer. Please try again.",
+        variant: "destructive"
       });
     }
   };
 
-  const handleCreateCustomer = (newCustomer: Customer) => {
-    const createdCustomer = onAddCustomer(newCustomer);
-    onCustomerChange(createdCustomer);
-  };
-
-  const handleDiscountTypeChange = (value: 'flat' | 'percentage') => {
-    if (value) {
-      setDiscountType(value);
+  const handleHoldCart = () => {
+    const holdId = onHoldCart();
+    if (holdId) {
+      toast({
+        title: "Cart Held",
+        description: "Your cart has been saved successfully."
+      });
     }
   };
 
-  const handleApplyDiscount = () => {
-    const numValue = parseFloat(tempDiscountValue) || 0;
+  const applyDiscount = () => {
+    const value = parseFloat(tempDiscountValue) || 0;
+    onSetCartDiscount(discountType, value);
     setDiscountValue(tempDiscountValue);
-    onSetCartDiscount(discountType, numValue);
-  };
-
-  const handleClearDiscount = () => {
-    setTempDiscountValue('0');
-    setDiscountValue('0');
-    onSetCartDiscount(discountType, 0);
   };
 
   const handleBarcodeScan = (barcode: string) => {
-    const foundProduct = products.find((product) => product.sku === barcode);
-    
-    if (foundProduct) {
-      onAddToCart(foundProduct);
+    // Find product by barcode
+    const product = products.find(p => p.barcode === barcode || p.sku === barcode);
+    if (product) {
+      onAddToCart(product);
       toast({
         title: "Product Added",
-        description: `${foundProduct.name} has been added to cart`
+        description: `${product.name} has been added to cart.`
       });
     } else {
       toast({
@@ -159,323 +174,391 @@ export function POSInvoice({
         variant: "destructive"
       });
     }
+    setIsScanning(false);
   };
 
-  const handleHoldCart = () => {
-    if (cart.length === 0) {
-      toast({
-        title: "Cannot Hold Cart",
-        description: "Cart is empty. Add items to cart before holding.",
-        variant: "destructive"
-      });
-      return;
+  // Add generateReceipt function
+  const generateReceipt = (order: Order) => {
+    const receiptContent = `
+      <html>
+        <head>
+          <title>Receipt - ${order.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .receipt-header { text-align: center; margin-bottom: 20px; }
+            .receipt-title { font-size: 24px; font-weight: bold; }
+            .receipt-info { margin-bottom: 20px; }
+            .receipt-items { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            .receipt-items th, .receipt-items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .receipt-items th { background-color: #f2f2f2; }
+            .receipt-totals { width: 100%; border-collapse: collapse; }
+            .receipt-totals td { padding: 4px; text-align: right; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .mb-10 { margin-bottom: 10px; }
+            .mt-20 { margin-top: 20px; }
+            .divider { border-top: 1px dashed #000; margin: 10px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-header">
+            <div class="receipt-title">${settings.businessName || 'Business Name'}</div>
+            <div>${settings.businessAddress || 'Business Address'}</div>
+            <div>Phone: ${settings.businessPhone || 'N/A'}</div>
+            <div class="divider"></div>
+            <div><strong>RECEIPT</strong></div>
+          </div>
+          
+          <div class="receipt-info">
+            <div>Order ID: ${order.id || 'N/A'}</div>
+            <div>Date: ${order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}</div>
+            <div>Customer: ${order.customer?.name || 'N/A'}</div>
+            <div>Payment Method: ${order.paymentMethod || 'N/A'}</div>
+          </div>
+          
+          <table class="receipt-items">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(order.items || []).map(item => `
+                <tr>
+                  <td>${item.product?.name || 'Unknown Item'}</td>
+                  <td>${item.quantity || 0}</td>
+                  <td>${settings.currency} ${(item.product?.price || 0).toFixed(2)}</td>
+                  <td>${settings.currency} ${(item.subtotal || 0).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <table class="receipt-totals">
+            <tr>
+              <td>Subtotal:</td>
+              <td>${settings.currency} ${(order.subtotal || 0).toFixed(2)}</td>
+            </tr>
+            ${order.discount > 0 ? `
+            <tr>
+              <td>Discount:</td>
+              <td>-${settings.currency} ${(order.discount || 0).toFixed(2)}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td>Tax (${settings.taxRate || 0}%):</td>
+              <td>${settings.currency} ${(order.tax || 0).toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td><strong>Total:</strong></td>
+              <td><strong>${settings.currency} ${(order.total || 0).toFixed(2)}</strong></td>
+            </tr>
+          </table>
+          
+          <div class="text-center mt-20">
+            <p>Thank you for your purchase!</p>
+            <p>Please visit again</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(receiptContent);
+      printWindow.document.close();
+      // Only focus the window, don't automatically print
+      printWindow.focus();
     }
+  };
 
-    if (isCartHeld) {
-      if (currentHoldId && onUnholdCart(currentHoldId)) {
-        toast({
-          title: "Cart Unheld",
-          description: "Cart has been restored from hold."
-        });
-      }
-    } else {
-      const holdId = onHoldCart();
-      if (holdId) {
-        toast({
-          title: "Cart Held",
-          description: "Cart has been held for later use."
-        });
-      }
+  // Add manual print function for explicit printing requests
+  const printReceipt = (order: Order) => {
+    const receiptContent = `
+      <html>
+        <head>
+          <title>Receipt - ${order.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .receipt-header { text-align: center; margin-bottom: 20px; }
+            .receipt-title { font-size: 24px; font-weight: bold; }
+            .receipt-info { margin-bottom: 20px; }
+            .receipt-items { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            .receipt-items th, .receipt-items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .receipt-items th { background-color: #f2f2f2; }
+            .receipt-totals { width: 100%; border-collapse: collapse; }
+            .receipt-totals td { padding: 4px; text-align: right; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .mb-10 { margin-bottom: 10px; }
+            .mt-20 { margin-top: 20px; }
+            .divider { border-top: 1px dashed #000; margin: 10px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-header">
+            <div class="receipt-title">${settings.businessName || 'Business Name'}</div>
+            <div>${settings.businessAddress || 'Business Address'}</div>
+            <div>Phone: ${settings.businessPhone || 'N/A'}</div>
+            <div class="divider"></div>
+            <div><strong>RECEIPT</strong></div>
+          </div>
+          
+          <div class="receipt-info">
+            <div>Order ID: ${order.id || 'N/A'}</div>
+            <div>Date: ${order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}</div>
+            <div>Customer: ${order.customer?.name || 'N/A'}</div>
+            <div>Payment Method: ${order.paymentMethod || 'N/A'}</div>
+          </div>
+          
+          <table class="receipt-items">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(order.items || []).map(item => `
+                <tr>
+                  <td>${item.product?.name || 'Unknown Item'}</td>
+                  <td>${item.quantity || 0}</td>
+                  <td>${settings.currency} ${(item.product?.price || 0).toFixed(2)}</td>
+                  <td>${settings.currency} ${(item.subtotal || 0).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <table class="receipt-totals">
+            <tr>
+              <td>Subtotal:</td>
+              <td>${settings.currency} ${(order.subtotal || 0).toFixed(2)}</td>
+            </tr>
+            ${order.discount > 0 ? `
+            <tr>
+              <td>Discount:</td>
+              <td>-${settings.currency} ${(order.discount || 0).toFixed(2)}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td>Tax (${settings.taxRate || 0}%):</td>
+              <td>${settings.currency} ${(order.tax || 0).toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td><strong>Total:</strong></td>
+              <td><strong>${settings.currency} ${(order.total || 0).toFixed(2)}</strong></td>
+            </tr>
+          </table>
+          
+          <div class="text-center mt-20">
+            <p>Thank you for your purchase!</p>
+            <p>Please visit again</p>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              // Close window after printing
+              window.onfocus = function() { 
+                setTimeout(function() { window.close(); }, 500); 
+              }
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(receiptContent);
+      printWindow.document.close();
     }
   };
 
   return (
     <>
-      <CustomerCreationPopup 
-        isOpen={showCustomerPopup} 
-        onClose={() => setShowCustomerPopup(false)} 
-        onCreate={handleCreateCustomer} 
+      <CustomerCreationPopup
+        isOpen={showCustomerPopup}
+        onClose={() => setShowCustomerPopup(false)}
+        onCreate={handleAddCustomer}
       />
       
-      {/* Split Payment Popup */}
       <SplitPaymentPopup
         isOpen={showSplitPaymentPopup}
-        totalAmount={totals.total}
-        currency={settings.currency}
         onClose={() => setShowSplitPaymentPopup(false)}
         onConfirm={handleSplitPaymentConfirm}
+        totalAmount={totals.total}
+        currency={settings.currency}
       />
-      
-      <Card className="h-full">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Sales Invoice
-            </CardTitle>
-            <Badge variant="outline">Invoice #{Date.now().toString().slice(-6)}</Badge>
-          </div>
-        </CardHeader>
 
-        <CardContent className="space-y-4">
-          {/* Customer Information */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <Label className="text-sm font-medium">Customer</Label>
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Select 
-                  value={customer.id} 
-                  onValueChange={(customerId) => {
-                    const selectedCustomer = customers.find(c => c.id === customerId);
-                    if (selectedCustomer) {
-                      onCustomerChange(selectedCustomer);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((cust) => (
-                      <SelectItem key={cust.id} value={cust.id!}>
-                        {cust.name} {cust.code ? `(${cust.code})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <Card className="h-full flex flex-col">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Invoice
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 flex flex-col">
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <Label>Customer</Label>
               <Button 
-                type="button" 
-                variant="outline" 
-                size="icon" 
-                className="h-9 w-9" 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 px-2"
                 onClick={() => setShowCustomerPopup(true)}
               >
-                <UserPlus className="h-4 w-4" />
+                <UserPlus className="h-4 w-4 mr-1" />
+                Add
               </Button>
             </div>
-            
-            {customer.name && (
-              <div className="text-sm text-muted-foreground">
-                {customer.contactName && <div>Contact: {customer.contactName}</div>}
-                {customer.phone && <div>Phone: {customer.phone}</div>}
-                {(customer.place || customer.emirate) && (
-                  <div>Location: {[customer.place, customer.emirate].filter(Boolean).join(', ')}</div>
-                )}
-              </div>
-            )}
+            <Select 
+              value={customer.id} 
+              onValueChange={(value) => {
+                const selectedCustomer = customers.find(c => c.id === value);
+                if (selectedCustomer) {
+                  onCustomerChange(selectedCustomer);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((cust) => (
+                  <SelectItem key={cust.id} value={cust.id}>
+                    {cust.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <Separator />
+          <Separator className="my-2" />
 
-          {/* Barcode Scanner (only shown in development) */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="py-4">
-              <BarcodeScanner onScan={handleBarcodeScan} />
-            </div>
-          )}
-          
-          {/* Cart Items */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Items ({cart.length})</Label>
-              {cart.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onClearCart}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Clear
-                </Button>
-              )}
-            </div>
-
+          <div className="flex-1 overflow-auto mb-4">
             {cart.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <CreditCard className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No items in cart</p>
-                <p className="text-sm">Add products to start billing</p>
+                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Your cart is empty</p>
+                <p className="text-sm">Add products to get started</p>
               </div>
             ) : (
-              <div className="max-h-64 overflow-y-auto space-y-2">
+              <div className="space-y-2">
                 {cart.map((item) => (
-                  <div key={item.id} className="border rounded-lg p-3 bg-muted/30">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">{item.product.name}</h4>
-                        <p className="text-xs text-muted-foreground">
-                          {item.product.description}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="ml-2">
-                        {item.product.category}
-                      </Badge>
+                  <div key={item.id} className="flex items-center gap-2 p-2 border rounded">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{item.product.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {settings.currency} {item.product.price.toFixed(2)} × {item.quantity}
+                      </p>
                     </div>
-
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="space-y-1">
-                        <div className="text-lg font-bold text-primary">
-                          AED {item.product.price.toFixed(2)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          SKU: {item.product.sku} • Barcode: {item.product.barcode} • Stock: {item.product.stock}
-                        </div>
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onRemoveItem(item.id)}
-                        className="text-destructive hover:text-destructive p-1 h-6 w-6"
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="w-8 text-center">{item.quantity}</span>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                      >
+                        <Plus className="h-3 w-3" />
                       </Button>
                     </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center text-sm">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="font-semibold text-sm">
-                          {settings.currency} {item.subtotal.toFixed(2)}
-                        </div>
-                        {item.discount > 0 && (
-                          <div className="text-xs text-warning">
-                            -{item.discount}% off
-                          </div>
-                        )}
-                      </div>
+                    <div className="text-right min-w-[70px]">
+                      <p className="font-medium">{settings.currency} {item.subtotal.toFixed(2)}</p>
+                      {item.discount > 0 && (
+                        <p className="text-xs text-muted-foreground line-through">
+                          {settings.currency} {(item.quantity * item.product.price).toFixed(2)}
+                        </p>
+                      )}
                     </div>
-
-                    <div className="flex items-center gap-2 mt-2">
-                      <Label className="text-xs text-muted-foreground">Disc%:</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={item.discount}
-                        onChange={(e) => onUpdateDiscount(item.id, Number(e.target.value))}
-                        className="h-6 text-xs w-16"
-                        placeholder="0"
-                      />
-                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0"
+                      onClick={() => onRemoveItem(item.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {cart.length > 0 && (
-            <>
-              <Separator />
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>{settings.currency} {totals.subtotal.toFixed(2)}</span>
-                </div>
-                
-                <div className="py-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-sm font-medium">Discount</Label>
-                  </div>
-                  <div className="flex gap-2 items-center">
-                    <ToggleGroup 
-                      type="single" 
-                      value={discountType} 
-                      onValueChange={handleDiscountTypeChange}
-                      className="gap-0"
-                    >
-                      <ToggleGroupItem 
-                        value="flat" 
-                        aria-label="Flat discount"
-                        className="rounded-r-none border-r-0 px-3 h-8 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                      >
-                        Flat
-                      </ToggleGroupItem>
-                      <ToggleGroupItem 
-                        value="percentage" 
-                        aria-label="Percentage discount"
-                        className="rounded-l-none border-l-0 px-3 h-8 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                      >
-                        %
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={tempDiscountValue}
-                      onChange={(e) => setTempDiscountValue(e.target.value)}
-                      className="h-8 flex-1 text-sm"
-                      placeholder={discountType === 'percentage' ? "Enter % discount" : "Enter flat discount"}
-                    />
-                    <Button 
-                      onClick={handleApplyDiscount}
-                      className="h-8 text-sm px-3"
-                    >
-                      Apply
-                    </Button>
-                  </div>
-                  {totals.discount > 0 && (
-                    <div className="flex justify-between text-sm mt-1">
-                      <span>Discount Applied:</span>
-                      <span className="text-destructive">-{settings.currency} {totals.discount.toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
-                
-                <Separator className="my-1" />
-                <div className="flex justify-between text-sm">
-                  <span>Tax ({settings.taxRate}%):</span>
-                  <span>{settings.currency} {totals.tax.toFixed(2)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span>{settings.currency} {totals.total.toFixed(2)}</span>
-                </div>
-              </div>
-            </>
-          )}
+          <Separator className="my-2" />
+
+          <div className="space-y-2 mb-4">
+            <div className="flex justify-between">
+              <span>Subtotal:</span>
+              <span>{settings.currency} {totals.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Discount:</span>
+              <span>- {settings.currency} {totals.discount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tax ({settings.taxRate}%):</span>
+              <span>{settings.currency} {totals.tax.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-lg">
+              <span>Total:</span>
+              <span>{settings.currency} {totals.total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <Separator className="my-2" />
 
           {cart.length > 0 && (
             <>
-              <Separator />
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={(value: Order['paymentMethod']) => setPaymentMethod(value)}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <Label>Cart Discount</Label>
+                  <ToggleGroup 
+                    type="single" 
+                    value={discountType}
+                    onValueChange={(value) => value && setDiscountType(value as 'flat' | 'percentage')}
+                  >
+                    <ToggleGroupItem value="percentage" aria-label="Percentage discount">
+                      %
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="flat" aria-label="Flat discount">
+                      {settings.currency}
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={tempDiscountValue}
+                    onChange={(e) => setTempDiscountValue(e.target.value)}
+                    placeholder={discountType === 'percentage' ? '0%' : `0${settings.currency}`}
+                  />
+                  <Button onClick={applyDiscount}>Apply</Button>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <Label className="mb-2 block">Payment Method</Label>
+                <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as Order['paymentMethod'])}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="credit">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        Credit
-                      </div>
-                    </SelectItem>
                     <SelectItem value="cash">
                       <div className="flex items-center gap-2">
                         <Banknote className="h-4 w-4" />
@@ -484,7 +567,7 @@ export function POSInvoice({
                     </SelectItem>
                     <SelectItem value="card">
                       <div className="flex items-center gap-2">
-                        <Wallet className="h-4 w-4" />
+                        <CreditCard className="h-4 w-4" />
                         Card
                       </div>
                     </SelectItem>
@@ -504,7 +587,7 @@ export function POSInvoice({
                   </SelectContent>
                 </Select>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 mt-2">
                   <Button 
                     onClick={handleHoldCart} 
                     className="w-full"
@@ -526,7 +609,26 @@ export function POSInvoice({
                     <CreditCard className="h-4 w-4 mr-2" />
                     Checkout
                   </Button>
-                  <Button variant="outline" onClick={() => window.print()} className="w-full">
+                  <Button variant="outline" onClick={() => {
+                    // Create a temporary order object for printing
+                    const tempOrder: Order = {
+                      id: 'TEMP-' + Date.now(),
+                      items: cart.map(item => ({
+                        ...item,
+                        subtotal: item.quantity * item.product.price
+                      })),
+                      customer,
+                      paymentMethod: paymentMethod,
+                      subtotal: totals.subtotal,
+                      discount: totals.discount,
+                      tax: totals.tax,
+                      total: totals.total,
+                      status: 'completed',
+                      createdAt: new Date(),
+                      updatedAt: new Date()
+                    };
+                    printReceipt(tempOrder);
+                  }} className="w-full">
                     <Printer className="h-4 w-4 mr-2" />
                     Print
                   </Button>

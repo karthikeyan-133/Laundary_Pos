@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,10 +18,11 @@ import { PaymentMethodSelector } from './PaymentMethodSelector';
 
 interface HomeDeliveryProps {
   orders: Order[];
-  onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: 'paid' | 'unpaid', paymentMethod?: Order['paymentMethod']) => void;
-  onUpdateOrderDeliveryStatus: (orderId: string, deliveryStatus: 'pending' | 'in-transit' | 'delivered') => void;
+  onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: 'paid' | 'unpaid', paymentMethod?: Order['paymentMethod']) => Promise<void>;
+  onUpdateOrderDeliveryStatus: (orderId: string, deliveryStatus: 'pending' | 'in-transit' | 'delivered') => Promise<void>;
   currency: string;
   onReturnOrder: (order: Order) => void;
+  onReloadOrders: () => Promise<void>; // Add this prop to reload orders
 }
 
 export function HomeDelivery({ 
@@ -29,7 +30,8 @@ export function HomeDelivery({
   onUpdateOrderPaymentStatus, 
   onUpdateOrderDeliveryStatus,
   currency,
-  onReturnOrder
+  onReturnOrder,
+  onReloadOrders // Destructure the new prop
 }: HomeDeliveryProps) {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<Order['paymentMethod']>('cash');
@@ -38,13 +40,25 @@ export function HomeDelivery({
     setEditingOrderId(orderId);
   };
 
-  const handlePaymentSubmit = (orderId: string) => {
-    onUpdateOrderPaymentStatus(orderId, 'paid', selectedPaymentMethod);
-    setEditingOrderId(null);
+  const handlePaymentSubmit = async (orderId: string) => {
+    try {
+      await onUpdateOrderPaymentStatus(orderId, 'paid', selectedPaymentMethod);
+      setEditingOrderId(null);
+      // Reload orders after payment update to reflect changes
+      await onReloadOrders();
+    } catch (error) {
+      console.error('Failed to update payment status:', error);
+    }
   };
 
-  const handleDeliveryStatusChange = (orderId: string, status: 'pending' | 'in-transit' | 'delivered') => {
-    onUpdateOrderDeliveryStatus(orderId, status);
+  const handleDeliveryStatusChange = async (orderId: string, status: 'pending' | 'in-transit' | 'delivered') => {
+    try {
+      await onUpdateOrderDeliveryStatus(orderId, status);
+      // Reload orders after delivery status update to reflect changes
+      await onReloadOrders();
+    } catch (error) {
+      console.error('Failed to update delivery status:', error);
+    }
   };
 
   // Filter COD orders

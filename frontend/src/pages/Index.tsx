@@ -68,7 +68,8 @@ const Index = () => {
     updateOrderDeliveryStatus,
     getCODOrders,
     loading,
-    error
+    error,
+    reloadOrders // Add reloadOrders function
   } = usePOSStore();
 
   const totals = calculateTotals();
@@ -117,6 +118,15 @@ const Index = () => {
     setReturnType(type);
     setActiveView('return-items');
     console.log('State updated: selectedOrderForReturn set and activeView set to return-items');
+  };
+
+  // Wrapper functions to handle async operations
+  const handleAddCustomer = async (customer: any) => {
+    return await addCustomer(customer);
+  };
+
+  const handleCheckout = async (paymentMethod: any, cashAmount?: number, cardAmount?: number) => {
+    return await createOrder(paymentMethod, cashAmount, cardAmount);
   };
 
   return (
@@ -242,7 +252,7 @@ const Index = () => {
 
         {activeView === 'reports' && (
           <div className="mt-6">
-            <Reports orders={orders} onReturnOrder={(order, type) => handleReturnOrder(order, type)} />
+            <Reports orders={orders} settings={settings} onReturnOrder={(order, type) => handleReturnOrder(order, type)} />
           </div>
         )}
 
@@ -254,6 +264,7 @@ const Index = () => {
               onUpdateOrderDeliveryStatus={updateOrderDeliveryStatus}
               currency={settings.currency}
               onReturnOrder={handleReturnOrder}
+              onReloadOrders={reloadOrders} // Pass the reloadOrders function
             />
           </div>
         )}

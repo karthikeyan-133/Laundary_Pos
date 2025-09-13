@@ -19,8 +19,7 @@ export function CustomerCreationPopup({ isOpen, onClose, onCreate }: CustomerCre
     phone: '',
     email: '',
     place: '',
-    emirate: '',
-    address: ''
+    emirate: ''
   });
 
   const handleChange = (field: keyof Customer, value: string) => {

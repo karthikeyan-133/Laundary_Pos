@@ -57,6 +57,27 @@ CREATE TABLE IF NOT EXISTS order_items (
   FOREIGN KEY (product_id) REFERENCES products(id)
 );
 
+-- Create returns table
+CREATE TABLE IF NOT EXISTS returns (
+  id VARCHAR(50) PRIMARY KEY,
+  order_id VARCHAR(50) NOT NULL,
+  reason TEXT,
+  refund_amount DECIMAL(10, 2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+);
+
+-- Create return_items table
+CREATE TABLE IF NOT EXISTS return_items (
+  id VARCHAR(50) PRIMARY KEY,
+  return_id VARCHAR(50) NOT NULL,
+  product_id VARCHAR(50) NOT NULL,
+  quantity INT NOT NULL,
+  refund_amount DECIMAL(10, 2) NOT NULL,
+  FOREIGN KEY (return_id) REFERENCES returns(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
 -- Create settings table
 CREATE TABLE IF NOT EXISTS settings (
   id INT PRIMARY KEY AUTO_INCREMENT,

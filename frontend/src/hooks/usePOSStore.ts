@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Product, CartItem, Customer, Order, POSSettings } from '@/types/pos';
 import { productsApi, customersApi, ordersApi, settingsApi } from '@/services/api';
+import { returnsApi } from '@/services/returnsApi';
 
 // Default settings
 const defaultSettings: POSSettings = {
@@ -27,11 +28,14 @@ const sampleCustomers: Customer[] = [
 
 // Helper function to convert product data types
 const convertProductDataTypes = (product: any): Product => {
-  return {
+  console.log('Converting product:', product);
+  const convertedProduct = {
     ...product,
     price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
     stock: typeof product.stock === 'string' ? parseInt(product.stock, 10) : product.stock
   };
+  console.log('Converted product:', convertedProduct);
+  return convertedProduct;
 };
 
 // Helper function to convert customer data types
@@ -67,6 +71,8 @@ const convertSettingsDataTypes = (settings: any): POSSettings => {
 
 // Helper function to convert order data types
 const convertOrderDataTypes = (order: any): Order => {
+  console.log('Converting order:', order.id, 'Raw order data:', order);
+  
   // Helper function to safely convert date strings to Date objects
   const safeDateConversion = (dateValue: string | Date | undefined | null): Date => {
     if (!dateValue) {
@@ -108,6 +114,21 @@ const convertOrderDataTypes = (order: any): Order => {
     customer = order.customer;
   }
   
+  // Process items
+  const items = order.items && Array.isArray(order.items) ? order.items.map((item: any) => {
+    console.log('Processing item:', item);
+    const processedItem = {
+      ...item,
+      product: convertProductDataTypes(item.product),
+      subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal,
+      discount: typeof item.discount === 'string' ? parseFloat(item.discount) : item.discount
+    };
+    console.log('Processed item:', processedItem);
+    return processedItem;
+  }) : [];
+  
+  console.log('Processed items for order:', order.id, 'Items count:', items.length, 'Items:', items);
+  
   return {
     ...order,
     customer, // Use the properly extracted customer data
@@ -123,12 +144,7 @@ const convertOrderDataTypes = (order: any): Order => {
     createdAt: safeDateConversion(createdAt),
     updatedAt: safeDateConversion(updatedAt),
     // Ensure items array exists and convert item data types
-    items: order.items && Array.isArray(order.items) ? order.items.map((item: any) => ({
-      ...item,
-      product: convertProductDataTypes(item.product),
-      subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal,
-      discount: typeof item.discount === 'string' ? parseFloat(item.discount) : item.discount
-    })) : []
+    items
   };
 };
 
@@ -172,9 +188,14 @@ export function usePOSStore() {
         }
         
         // Load orders
+        console.log('Fetching orders from API...');
         const fetchedOrders = await ordersApi.getAll();
+        console.log('Raw orders from API:', fetchedOrders);
+        
         // Convert data types for orders
         const convertedOrders = fetchedOrders.map(convertOrderDataTypes);
+        console.log('Converted orders:', convertedOrders);
+        
         setOrders(convertedOrders);
         
         // Load settings
@@ -197,19 +218,10 @@ export function usePOSStore() {
         
         if (!lastLoginDate || lastLoginDate !== today) {
           setShowOpeningCashPopup(true);
-          localStorage.setItem('pos-last-login-date', today);
         }
-        
-        // Load held carts from localStorage (these are temporary and don't need to be in DB)
-        const savedHeldCarts = localStorage.getItem('pos-held-carts');
-        if (savedHeldCarts) {
-          setHeldCarts(JSON.parse(savedHeldCarts));
-        }
-        
-        setError(null);
       } catch (err) {
         console.error('Failed to load data:', err);
-        setError('Failed to load data from server');
+        setError('Failed to load data');
       } finally {
         setLoading(false);
       }
@@ -335,7 +347,7 @@ export function usePOSStore() {
       const { subtotal, discount, tax, total } = calculateTotals();
       
       // Prepare order data
-      const newOrderData = {
+      const newOrderData: any = {
         customer_id: customer.id,
         subtotal,
         discount,
@@ -365,6 +377,23 @@ export function usePOSStore() {
 
       // Send to API
       const createdOrder = await ordersApi.create(newOrderData);
+      
+      // Update product stock levels
+      const updatedProducts = [...products];
+      for (const cartItem of cart) {
+        const productIndex = updatedProducts.findIndex(p => p.id === cartItem.product.id);
+        if (productIndex !== -1) {
+          updatedProducts[productIndex] = {
+            ...updatedProducts[productIndex],
+            stock: updatedProducts[productIndex].stock - cartItem.quantity
+          };
+          // Update product in database
+          await productsApi.update(cartItem.product.id, {
+            stock: updatedProducts[productIndex].stock
+          });
+        }
+      }
+      setProducts(updatedProducts);
       
       // Reload orders to ensure we have the latest data
       await reloadOrders();
@@ -612,14 +641,14 @@ export function usePOSStore() {
   const updateOrderPaymentStatus = async (orderId: string, paymentStatus: 'paid' | 'unpaid', paymentMethod?: Order['paymentMethod']) => {
     try {
       // Prepare the update data
-      const updateData: Partial<Order> = {
-        paymentStatus,
-        updatedAt: new Date()
+      const updateData: any = {
+        payment_status: paymentStatus,
+        updated_at: new Date()
       };
       
       // If payment method is provided, update it
       if (paymentMethod) {
-        updateData.paymentMethod = paymentMethod;
+        updateData.payment_method = paymentMethod;
       }
       
       // If payment is made, update order status to completed
@@ -637,6 +666,9 @@ export function usePOSStore() {
       setOrders(prev => prev.map(order => 
         order.id === orderId ? convertedOrder : order
       ));
+      
+      // Reload orders to ensure all components have updated data
+      await reloadOrders();
     } catch (err) {
       console.error('Failed to update order payment status:', err);
       setError('Failed to update order payment status');
@@ -647,9 +679,9 @@ export function usePOSStore() {
   const updateOrderDeliveryStatus = async (orderId: string, deliveryStatus: 'pending' | 'in-transit' | 'delivered') => {
     try {
       // Prepare the update data
-      const updateData: Partial<Order> = {
-        deliveryStatus,
-        updatedAt: new Date()
+      const updateData: any = {
+        delivery_status: deliveryStatus,
+        updated_at: new Date()
       };
       
       // Call API to update the order
@@ -662,6 +694,9 @@ export function usePOSStore() {
       setOrders(prev => prev.map(order => 
         order.id === orderId ? convertedOrder : order
       ));
+      
+      // Reload orders to ensure all components have updated data
+      await reloadOrders();
     } catch (err) {
       console.error('Failed to update order delivery status:', err);
       setError('Failed to update order delivery status');
@@ -671,6 +706,60 @@ export function usePOSStore() {
   // Get COD orders
   const getCODOrders = () => {
     return orders.filter(order => order.paymentMethod === 'cod');
+  };
+  
+  // Add returns state
+  const [returns, setReturns] = useState<any[]>([]);
+  
+  // Add function to process returns
+  const processReturn = async (orderId: string, items: any[], reason?: string) => {
+    try {
+      // Calculate total refund amount
+      const refundAmount = items.reduce((total, item) => {
+        return total + (item.quantity * item.product.price * (1 - item.discount / 100));
+      }, 0);
+      
+      // Prepare return data
+      const returnData = {
+        order_id: orderId,
+        reason,
+        refund_amount: refundAmount,
+        items: items.map(item => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          refund_amount: item.quantity * item.product.price * (1 - item.discount / 100)
+        }))
+      };
+      
+      // Send to API
+      const createdReturn = await returnsApi.create(returnData);
+      
+      // Update product stock levels
+      const updatedProducts = [...products];
+      for (const item of items) {
+        const productIndex = updatedProducts.findIndex(p => p.id === item.product.id);
+        if (productIndex !== -1) {
+          updatedProducts[productIndex] = {
+            ...updatedProducts[productIndex],
+            stock: updatedProducts[productIndex].stock + item.quantity
+          };
+          // Update product in database
+          await productsApi.update(item.product.id, {
+            stock: updatedProducts[productIndex].stock
+          });
+        }
+      }
+      setProducts(updatedProducts);
+      
+      // Add to returns list
+      setReturns(prev => [...prev, createdReturn]);
+      
+      return createdReturn;
+    } catch (err) {
+      console.error('Failed to process return:', err);
+      setError('Failed to process return');
+      return null;
+    }
   };
 
   return {
@@ -713,6 +802,9 @@ export function usePOSStore() {
     updateOrderPaymentStatus,
     updateOrderDeliveryStatus,
     getCODOrders,
+    processReturn,
+    returns,
+    reloadOrders, // Export the reloadOrders function
 
     // Dashboard data
     getTodayOrders,
