@@ -37,6 +37,8 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
       'Content-Type': 'application/json',
       ...options.headers,
     },
+    // Add timeout to prevent hanging requests
+    signal: AbortSignal.timeout(10000), // 10 second timeout
     ...options,
   };
 

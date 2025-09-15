@@ -80,6 +80,7 @@ export function POSInvoice({
   const [discountValue, setDiscountValue] = useState<string>(cartDiscount.value.toString());
   const [tempDiscountValue, setTempDiscountValue] = useState<string>(cartDiscount.value.toString());
   const [isScanning, setIsScanning] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // Add processing state
   const { toast } = useToast();
 
   useEffect(() => {
@@ -95,16 +96,29 @@ export function POSInvoice({
       return;
     }
     
-    const order = await onCheckout(paymentMethod);
-    if (order) {
-      setPaymentMethod('cash');
+    // Show loading state immediately
+    setIsProcessing(true);
+    
+    try {
+      const order = await onCheckout(paymentMethod);
+      if (order) {
+        setPaymentMethod('cash');
+        toast({
+          title: "Checkout Successful",
+          description: "Order has been processed successfully."
+        });
+        
+        // Show success message without automatic printing
+        console.log("Checkout completed. Invoice available for printing from report page.");
+      }
+    } catch (error) {
       toast({
-        title: "Checkout Successful",
-        description: "Order has been processed successfully."
+        title: "Checkout Failed",
+        description: "Failed to process order. Please try again.",
+        variant: "destructive"
       });
-      
-      // Show success message without automatic printing
-      console.log("Checkout completed. Invoice available for printing from report page.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -112,15 +126,28 @@ export function POSInvoice({
   const handleSplitPaymentConfirm = async (cashAmount: number, cardAmount: number) => {
     setShowSplitPaymentPopup(false);
     
-    const order = await onCheckout('both', cashAmount, cardAmount);
-    if (order) {
+    // Show loading state immediately
+    setIsProcessing(true);
+    
+    try {
+      const order = await onCheckout('both', cashAmount, cardAmount);
+      if (order) {
+        toast({
+          title: "Checkout Successful",
+          description: "Order has been processed successfully."
+        });
+        
+        // Show success message without automatic printing
+        console.log("Checkout completed. Invoice available for printing from report page.");
+      }
+    } catch (error) {
       toast({
-        title: "Checkout Successful",
-        description: "Order has been processed successfully."
+        title: "Checkout Failed",
+        description: "Failed to process order. Please try again.",
+        variant: "destructive"
       });
-      
-      // Show success message without automatic printing
-      console.log("Checkout completed. Invoice available for printing from report page.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -612,9 +639,18 @@ export function POSInvoice({
                       </>
                     )}
                   </Button>
-                  <Button onClick={handleCheckout} className="w-full">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Checkout
+                  <Button onClick={handleCheckout} className="w-full" disabled={isProcessing}>
+                    {isProcessing ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Processing...
+                      </div>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Checkout
+                      </>
+                    )}
                   </Button>
                   <Button variant="outline" onClick={() => {
                     // Create a temporary order object for printing

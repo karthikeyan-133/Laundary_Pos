@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { DollarSign } from 'lucide-react';
+import { Banknote } from 'lucide-react';
 
 interface OpeningCashPopupProps {
   isOpen: boolean;
@@ -27,7 +27,7 @@ export function OpeningCashPopup({ isOpen, onSubmit }: OpeningCashPopupProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
+            <Banknote className="h-5 w-5" />
             Opening Cash Balance
           </DialogTitle>
         </DialogHeader>

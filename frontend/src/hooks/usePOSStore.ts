@@ -160,7 +160,11 @@ export function usePOSStore() {
   const [customer, setCustomer] = useState<Customer>(sampleCustomers[0]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<POSSettings>(defaultSettings);
-  const [openingCash, setOpeningCash] = useState<number>(0);
+  const [openingCash, setOpeningCash] = useState<number>(() => {
+    // Load opening cash from localStorage if available
+    const savedOpeningCash = localStorage.getItem('pos-opening-cash');
+    return savedOpeningCash ? parseFloat(savedOpeningCash) : 0;
+  });
   const [showOpeningCashPopup, setShowOpeningCashPopup] = useState<boolean>(false);
   const [cartDiscount, setCartDiscountState] = useState<{ type: 'flat' | 'percentage'; value: number }>({ type: 'percentage', value: 0 });
   const [heldCarts, setHeldCarts] = useState<{[key: string]: {cart: CartItem[], customer: Customer, timestamp: Date}}>({});
@@ -175,14 +179,18 @@ export function usePOSStore() {
       try {
         setLoading(true);
         
-        // Load products
-        const fetchedProducts = await productsApi.getAll();
+        // Load all data in parallel to improve loading time
+        const [fetchedProducts, fetchedCustomers, fetchedOrders, fetchedSettings] = await Promise.all([
+          productsApi.getAll(),
+          customersApi.getAll(),
+          ordersApi.getAll(),
+          settingsApi.get().catch(() => null) // Settings are optional, so we catch errors
+        ]);
+        
         // Convert data types for products
         const convertedProducts = fetchedProducts.map(convertProductDataTypes);
         setProducts(convertedProducts);
         
-        // Load customers
-        const fetchedCustomers = await customersApi.getAll();
         // Convert data types for customers
         const convertedCustomers = fetchedCustomers.map(convertCustomerDataTypes);
         setCustomers(convertedCustomers);
@@ -192,26 +200,20 @@ export function usePOSStore() {
           setCustomer(convertedCustomers[0]);
         }
         
-        // Load orders
-        console.log('Fetching orders from API...');
-        const fetchedOrders = await ordersApi.getAll();
-        console.log('Raw orders from API:', fetchedOrders);
-        
         // Convert data types for orders
+        console.log('Raw orders from API:', fetchedOrders);
         const convertedOrders = fetchedOrders.map(convertOrderDataTypes);
         console.log('Converted orders:', convertedOrders);
-        
         setOrders(convertedOrders);
         
-        // Load settings
-        try {
-          const fetchedSettings = await settingsApi.get();
+        // Handle settings
+        if (fetchedSettings) {
           console.log('Raw settings from API:', fetchedSettings);
           // Convert data types for settings
           const convertedSettings = convertSettingsDataTypes(fetchedSettings);
           console.log('Converted settings:', convertedSettings);
           setSettings(convertedSettings);
-        } catch (settingsError) {
+        } else {
           // If settings don't exist, use defaults
           console.warn('Settings not found, using defaults');
           setSettings(defaultSettings);
@@ -385,26 +387,41 @@ export function usePOSStore() {
       // Send to API
       const createdOrder = await ordersApi.create(newOrderData);
       
-      // Update product stock levels
-      const updatedProducts = [...products];
-      for (const cartItem of cart) {
-        const productIndex = updatedProducts.findIndex(p => p.id === cartItem.product.id);
-        if (productIndex !== -1) {
-          updatedProducts[productIndex] = {
-            ...updatedProducts[productIndex],
-            stock: updatedProducts[productIndex].stock - cartItem.quantity
-          };
+      // Update product stock levels in parallel for better performance
+      const stockUpdatePromises = cart.map(async (cartItem) => {
+        const product = products.find(p => p.id === cartItem.product.id);
+        if (product) {
+          const newStock = product.stock - cartItem.quantity;
           // Update product in database
           await productsApi.update(cartItem.product.id, {
-            stock: updatedProducts[productIndex].stock
+            stock: newStock
           });
+          return { productId: cartItem.product.id, newStock };
         }
-      }
-      setProducts(updatedProducts);
+        return null;
+      });
       
-      // Reload orders to ensure we have the latest data
-      await reloadOrders();
+      // Wait for all stock updates to complete
+      const stockUpdates = await Promise.all(stockUpdatePromises);
+      
+      // Update products state with new stock levels
+      setProducts(prevProducts => 
+        prevProducts.map(product => {
+          const stockUpdate = stockUpdates.find(update => update && update.productId === product.id);
+          if (stockUpdate) {
+            return { ...product, stock: stockUpdate.newStock };
+          }
+          return product;
+        })
+      );
+      
+      // Clear cart immediately without waiting for orders reload
       clearCart();
+      
+      // Reload orders in background without blocking the UI
+      reloadOrders().catch(err => {
+        console.error('Failed to reload orders in background:', err);
+      });
       
       return createdOrder;
     } catch (err) {
@@ -420,7 +437,13 @@ export function usePOSStore() {
       const fetchedOrders = await ordersApi.getAll();
       // Convert data types for orders
       const convertedOrders = fetchedOrders.map(convertOrderDataTypes);
-      setOrders(convertedOrders);
+      setOrders(prevOrders => {
+        // Only update if there are actual changes
+        if (JSON.stringify(prevOrders) !== JSON.stringify(convertedOrders)) {
+          return convertedOrders;
+        }
+        return prevOrders;
+      });
     } catch (err) {
       console.error('Failed to reload orders:', err);
       setError('Failed to reload orders');
@@ -444,6 +467,8 @@ export function usePOSStore() {
   const setOpeningCashAmount = (amount: number) => {
     setOpeningCash(amount);
     setShowOpeningCashPopup(false);
+    // Save opening cash to localStorage
+    localStorage.setItem('pos-opening-cash', amount.toString());
   };
 
   const getTodayOrders = (orderList: Order[] = orders) => {
@@ -967,7 +992,10 @@ export function usePOSStore() {
 
   // Fetch returns when the hook is initialized
   useEffect(() => {
-    fetchReturns();
+    // Load returns in background without blocking the main loading process
+    fetchReturns().catch(err => {
+      console.error('Failed to fetch returns in background:', err);
+    });
   }, []); // Only run once on mount
 
   return {
