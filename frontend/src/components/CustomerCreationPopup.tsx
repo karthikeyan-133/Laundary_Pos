@@ -3,7 +3,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Customer } from '@/types/pos';
+
+// Define the 7 UAE Emirates
+const UAE_EMIRATES = [
+  "Abu Dhabi",
+  "Dubai",
+  "Sharjah",
+  "Ajman",
+  "Umm Al Quwain",
+  "Ras Al Khaimah",
+  "Fujairah"
+];
 
 interface CustomerCreationPopupProps {
   isOpen: boolean;
@@ -37,8 +55,7 @@ export function CustomerCreationPopup({ isOpen, onClose, onCreate }: CustomerCre
       phone: '',
       email: '',
       place: '',
-      emirate: '',
-      address: ''
+      emirate: ''
     });
     onClose();
   };
@@ -116,12 +133,18 @@ export function CustomerCreationPopup({ isOpen, onClose, onCreate }: CustomerCre
             
             <div>
               <Label htmlFor="emirate">Emirate</Label>
-              <Input
-                id="emirate"
-                value={formData.emirate}
-                onChange={(e) => handleChange('emirate', e.target.value)}
-                placeholder="Enter emirate"
-              />
+              <Select value={formData.emirate} onValueChange={(value) => handleChange('emirate', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select emirate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {UAE_EMIRATES.map((emirate) => (
+                    <SelectItem key={emirate} value={emirate}>
+                      {emirate}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           

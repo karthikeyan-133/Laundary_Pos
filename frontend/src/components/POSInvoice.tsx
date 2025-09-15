@@ -433,7 +433,14 @@ export function POSInvoice({
               <SelectContent>
                 {customers.map((cust) => (
                   <SelectItem key={cust.id} value={cust.id}>
-                    {cust.name}
+                    <div className="flex items-center justify-between w-full">
+                      <span>{cust.name}</span>
+                      {cust.emirate && (
+                        <span className="ml-2 text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
+                          {cust.emirate}
+                        </span>
+                      )}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
