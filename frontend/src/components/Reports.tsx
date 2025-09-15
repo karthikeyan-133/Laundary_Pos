@@ -54,21 +54,35 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
       return 'Invalid Date';
     }
     
-    return dateObj.toLocaleDateString();
+    // Adjust for Dubai time (UTC+4)
+    const dubaiTime = new Date(dateObj.getTime() + (4 * 60 * 60 * 1000));
+    
+    return dubaiTime.toLocaleString('en-US', { 
+      timeZone: 'Asia/Dubai',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  // Filter orders based on date range
+  // Filter orders based on date range and return status
   const filterOrdersByDate = (orders: Order[]): Order[] => {
     console.log('filterOrdersByDate called with:', { orders, fromDate, toDate });
     console.log('Filter dates - From:', fromDate, 'To:', toDate);
     
-    // If no date filters are set, return all orders
+    // First, filter out returned orders
+    const nonReturnedOrders = orders.filter(order => order.status !== 'returned');
+    console.log('After filtering out returned orders:', nonReturnedOrders.length, 'out of', orders.length);
+    
+    // If no date filters are set, return all non-returned orders
     if ((!fromDate || fromDate === '') && (!toDate || toDate === '')) {
-      console.log('No date filters applied, returning all orders');
-      return orders;
+      console.log('No date filters applied, returning all non-returned orders');
+      return nonReturnedOrders;
     }
     
-    const filtered = orders.filter(order => {
+    const filtered = nonReturnedOrders.filter(order => {
       try {
         // Convert order createdAt to Date object if it's not already
         let orderDate: Date;
@@ -193,7 +207,7 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
     }
     
     // Close the return options dialog
-    setShowReturnOptions(false);
+    closeReturnOptions();
   };
 
   // Close return options dialog
@@ -296,7 +310,14 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
           
           <div class="receipt-info">
             <div>Order ID: ${order.id}</div>
-            <div>Date: ${new Date(order.createdAt).toLocaleString()}</div>
+            <div>Date: ${new Date(order.createdAt).toLocaleString('en-US', { 
+              timeZone: 'Asia/Dubai',
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}</div>
             <div>Customer: ${order.customer?.name || 'N/A'}</div>
             <div>Payment: ${order.paymentMethod}</div>
           </div>

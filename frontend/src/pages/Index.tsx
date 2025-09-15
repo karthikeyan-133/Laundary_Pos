@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductList } from '@/components/ProductList';
 import { Receipt } from '@/components/Receipt';
+import { ReturnReceipt } from '@/components/ReturnReceipt'; // Import ReturnReceipt
+import { ReturnRecords } from '@/components/ReturnRecords'; // Import ReturnRecords
 import { Dashboard } from '@/components/Dashboard';
 import { Reports } from '@/components/Reports';
 import { POSInvoice } from '@/components/POSInvoice';
@@ -26,13 +28,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Order } from '@/types/pos';
+import { Order, CartItem } from '@/types/pos';
 import { ProductManagement } from '@/components/ProductManagement';
 
 const Index = () => {
-  const [activeView, setActiveView] = useState<'pos' | 'receipt' | 'dashboard' | 'reports' | 'products' | 'return-bills' | 'return-items' | 'product-management' | 'home-delivery'>('pos');
+  const [activeView, setActiveView] = useState<'pos' | 'receipt' | 'dashboard' | 'reports' | 'products' | 'return-bills' | 'return-items' | 'product-management' | 'home-delivery' | 'return-records'>('pos');
   const [selectedOrderForReturn, setSelectedOrderForReturn] = useState<Order | null>(null);
   const [returnType, setReturnType] = useState<'complete' | 'partial' | null>(null);
+  const [processedOrderId, setProcessedOrderId] = useState<string | null>(null); // Track processed order ID
+  const [returnItems, setReturnItems] = useState<Record<string, number>>({}); // Track return items
+  const [returnReason, setReturnReason] = useState<string>(''); // Track return reason
   const navigate = useNavigate();
   
   const {
@@ -69,7 +74,9 @@ const Index = () => {
     getCODOrders,
     loading,
     error,
-    reloadOrders // Add reloadOrders function
+    reloadOrders, // Add reloadOrders function
+    returns, // Add returns data
+    clearReturns // Add clearReturns function
   } = usePOSStore();
 
   const totals = calculateTotals();
@@ -120,6 +127,30 @@ const Index = () => {
     console.log('State updated: selectedOrderForReturn set and activeView set to return-items');
   };
 
+  // Callback function for when a return is processed successfully
+  const handleReturnProcessed = (orderId: string, items: Record<string, number>, reason: string) => {
+    console.log('Return processed for order:', orderId, 'Items:', items, 'Reason:', reason);
+    setProcessedOrderId(orderId);
+    setReturnItems(items);
+    setReturnReason(reason);
+    
+    // Navigate to the receipt view to show the processed return
+    setActiveView('receipt');
+  };
+
+  // Function to handle viewing a receipt
+  const handleViewReceipt = (order: Order) => {
+    setProcessedOrderId(order.id);
+    // For now, we'll just show the regular receipt
+    setActiveView('receipt');
+  };
+
+  // Function to handle printing a receipt
+  const handlePrintReceipt = (order: Order) => {
+    // This would typically generate and print a receipt
+    alert(`Printing receipt for order ${order.id}`);
+  };
+
   // Wrapper functions to handle async operations
   const handleAddCustomer = async (customer: any) => {
     return await addCustomer(customer);
@@ -128,6 +159,10 @@ const Index = () => {
   const handleCheckout = async (paymentMethod: any, cashAmount?: number, cardAmount?: number) => {
     return await createOrder(paymentMethod, cashAmount, cardAmount);
   };
+
+  // Filter out returned orders for display in reports and other components
+  const nonReturnedOrders = orders.filter(order => order.status !== 'returned');
+  console.log('Index.tsx - Non-returned orders count:', nonReturnedOrders.length, 'Total orders:', orders.length);
 
   return (
     <div className="min-h-screen bg-background">
@@ -181,6 +216,14 @@ const Index = () => {
                 >
                   <RotateCcw className="h-4 w-4" />
                   Return
+                </Button>
+                <Button 
+                  variant={activeView === 'return-records' ? "default" : "ghost"} 
+                  className="flex items-center gap-2"
+                  onClick={() => setActiveView('return-records')}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Return Records
                 </Button>
               </nav>
             </div>
@@ -252,19 +295,19 @@ const Index = () => {
 
         {activeView === 'reports' && (
           <div className="mt-6">
-            <Reports orders={orders} settings={settings} onReturnOrder={(order, type) => handleReturnOrder(order, type)} />
+            <Reports orders={nonReturnedOrders} settings={settings} onReturnOrder={(order, type) => handleReturnOrder(order, type)} />
           </div>
         )}
 
         {activeView === 'home-delivery' && (
           <div className="mt-6">
             <HomeDelivery 
-              orders={orders}
+              orders={nonReturnedOrders}
               onUpdateOrderPaymentStatus={updateOrderPaymentStatus}
               onUpdateOrderDeliveryStatus={updateOrderDeliveryStatus}
               currency={settings.currency}
               onReturnOrder={handleReturnOrder}
-              onReloadOrders={reloadOrders} // Pass the reloadOrders function
+              onReloadOrders={reloadOrders}
             />
           </div>
         )}
@@ -286,8 +329,15 @@ const Index = () => {
               </Button>
             </div>
             {activeView === 'return-bills' ? 
-              <ReturnByBills /> : 
-              <ReturnByItems preselectedOrder={selectedOrderForReturn} returnType={returnType} />
+              <ReturnByBills onReturnProcessed={handleReturnProcessed} onViewReceipt={handleViewReceipt} onPrintReceipt={handlePrintReceipt} /> : 
+              <ReturnByItems 
+                key={`${selectedOrderForReturn?.id}-${returnType}`} 
+                preselectedOrder={selectedOrderForReturn} 
+                returnType={returnType} 
+                onReturnProcessed={handleReturnProcessed}
+                onViewReceipt={handleViewReceipt}
+                onPrintReceipt={handlePrintReceipt}
+              />
             }
           </div>
         )}
@@ -336,9 +386,55 @@ const Index = () => {
           </Card>
         </div>
 
-        {activeView === 'receipt' && lastOrder && (
+        {activeView === 'receipt' && (
           <div className="mt-6">
-            <Receipt order={lastOrder} settings={settings} />
+            {processedOrderId ? (
+              // Show the return receipt for the processed return
+              <ReturnReceipt 
+                order={orders.find(o => o.id === processedOrderId) || null} 
+                settings={settings} 
+                returnItems={returnItems}
+                returnReason={returnReason}
+              />
+            ) : lastOrder ? (
+              // Show the last order receipt
+              <Receipt order={lastOrder} settings={settings} />
+            ) : (
+              // Fallback message if no order is available
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <p>No receipt available</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {activeView === 'return-records' && (
+          <div className="mt-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Return Records</h2>
+              <Button 
+                variant="destructive" 
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to clear all return records? This action cannot be undone.')) {
+                    try {
+                      await clearReturns();
+                      alert('All return records have been cleared successfully.');
+                    } catch (error) {
+                      alert('Failed to clear return records: ' + (error as Error).message);
+                    }
+                  }
+                }}
+              >
+                Clear All Returns
+              </Button>
+            </div>
+            <ReturnRecords 
+              returns={returns} 
+              onViewReceipt={handleViewReceipt}
+              onPrintReceipt={handlePrintReceipt}
+            />
           </div>
         )}
 

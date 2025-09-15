@@ -69,14 +69,25 @@ const convertSettingsDataTypes = (settings: any): POSSettings => {
   return convertedSettings;
 };
 
+// Helper function to get Dubai time
+const getDubaiTime = (): Date => {
+  // Create a new date object for current time
+  const now = new Date();
+  // Dubai is UTC+4
+  const dubaiOffset = 4 * 60; // 4 hours in minutes
+  const localOffset = now.getTimezoneOffset();
+  const dubaiTime = new Date(now.getTime() + (localOffset + dubaiOffset) * 60000);
+  return dubaiTime;
+};
+
 // Helper function to convert order data types
 const convertOrderDataTypes = (order: any): Order => {
   console.log('Converting order:', order.id, 'Raw order data:', order);
   
-  // Helper function to safely convert date strings to Date objects
+  // Helper function to safely convert date strings to Date objects in Dubai time
   const safeDateConversion = (dateValue: string | Date | undefined | null): Date => {
     if (!dateValue) {
-      return new Date(); // Return current date as fallback
+      return getDubaiTime(); // Return current Dubai time as fallback
     }
     
     if (dateValue instanceof Date) {
@@ -88,7 +99,7 @@ const convertOrderDataTypes = (order: any): Order => {
     
     // Check if the parsed date is valid
     if (isNaN(parsedDate.getTime())) {
-      return new Date(); // Return current date as fallback for invalid dates
+      return getDubaiTime(); // Return current Dubai time as fallback for invalid dates
     }
     
     return parsedDate;
@@ -103,26 +114,13 @@ const convertOrderDataTypes = (order: any): Order => {
   const deliveryStatus = order.delivery_status !== undefined ? order.delivery_status : order.deliveryStatus;
   const paymentStatus = order.payment_status !== undefined ? order.payment_status : order.paymentStatus;
   
-  // Extract customer data from nested 'customers' property
-  let customer: Customer;
-  if (order.customers) {
-    customer = {
-      id: order.customer_id,
-      ...order.customers
-    };
-  } else {
-    customer = order.customer;
-  }
+  // Extract customer data with proper field mapping
+  const customer = order.customers || order.customer || {};
   
-  // Process items
-  const items = order.items && Array.isArray(order.items) ? order.items.map((item: any) => {
-    console.log('Processing item:', item);
-    
-    // Handle both 'product' and 'products' properties from backend
-    let product = item.product;
-    if (!product && item.products) {
-      product = item.products;
-    }
+  // Process items array
+  const items = order.items ? order.items.map((item: any) => {
+    // Handle both 'product' and 'products' field names from backend
+    const product = item.product || item.products || {};
     
     const processedItem = {
       ...item,
@@ -221,10 +219,12 @@ export function usePOSStore() {
         
         // Check if it's a new day for opening cash popup
         const lastLoginDate = localStorage.getItem('pos-last-login-date');
-        const today = new Date().toDateString();
+        const today = getDubaiTime().toDateString();
         
         if (!lastLoginDate || lastLoginDate !== today) {
           setShowOpeningCashPopup(true);
+          // Update the last login date to today
+          localStorage.setItem('pos-last-login-date', today);
         }
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -447,7 +447,7 @@ export function usePOSStore() {
   };
 
   const getTodayOrders = (orderList: Order[] = orders) => {
-    const today = new Date();
+    const today = getDubaiTime();
     today.setHours(0, 0, 0, 0);
 
     return orderList.filter(order => {
@@ -721,53 +721,254 @@ export function usePOSStore() {
   // Add function to process returns
   const processReturn = async (orderId: string, items: any[], reason?: string) => {
     try {
+      console.log('Processing return for order:', orderId, 'Items:', items, 'Reason:', reason);
+      
+      // Validate that the order ID exists in our orders list
+      const orderExists = orders.some(order => order.id === orderId);
+      if (!orderExists) {
+        console.error('Order ID does not exist:', orderId);
+        setError(`Invalid order ID: ${orderId}. Please refresh the page and try again.`);
+        return null;
+      }
+      
+      // Validate items
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const product = item.product || (item.item && item.item.product);
+        
+        if (!product) {
+          console.error('Missing product in item at index:', i, item);
+          setError(`Missing product information in item ${i + 1}. Please refresh the page and try again.`);
+          return null;
+        }
+        
+        // Check if we can identify the product
+        let productId = product.id;
+        if (!productId && product.sku) {
+          // Try to find the product in our products list by SKU
+          const matchingProduct = products.find(p => p.sku === product.sku);
+          if (matchingProduct) {
+            productId = matchingProduct.id;
+          }
+        }
+        
+        if (!productId) {
+          console.error('Could not identify product in item at index:', i, product);
+          setError(`Could not identify product in item ${i + 1}. Please refresh the page and try again.`);
+          return null;
+        }
+      }
+      
       // Calculate total refund amount
       const refundAmount = items.reduce((total, item) => {
-        return total + (item.quantity * item.product.price * (1 - item.discount / 100));
+        // Handle both data structures: with 'item' property or direct properties
+        const quantity = item.quantity || (item.item && item.item.quantity) || 0;
+        const price = item.product?.price || (item.item && item.item.product?.price) || 0;
+        const discount = item.discount || (item.item && item.item.discount) || 0;
+        const refund = quantity * price * (1 - discount / 100);
+        console.log('Item refund calculation:', { quantity, price, discount, refund });
+        return total + refund;
       }, 0);
+      
+      console.log('Total refund amount calculated:', refundAmount);
       
       // Prepare return data
       const returnData = {
         order_id: orderId,
         reason,
         refund_amount: refundAmount,
-        items: items.map(item => ({
-          product_id: item.product.id,
-          quantity: item.quantity,
-          refund_amount: item.quantity * item.product.price * (1 - item.discount / 100)
-        }))
+        items: items.map(item => {
+          // Handle both data structures: with 'item' property or direct properties
+          const product = item.product || (item.item && item.item.product);
+          const quantity = item.quantity || (item.item && item.item.quantity) || 0;
+          const price = product?.price || 0;
+          const discount = item.discount || (item.item && item.item.discount) || 0;
+          const refund = quantity * price * (1 - discount / 100);
+          
+          console.log('Mapping item for return:', { product, quantity, price, discount, refund });
+          
+          // Validate that product exists
+          if (!product) {
+            throw new Error('Product is missing for return item');
+          }
+          
+          // Find the actual product ID from our products list
+          // This ensures we use the real database ID rather than just the SKU
+          let productId = product.id;
+          if (!productId && product.sku) {
+            // Try to find the product in our products list by SKU
+            const matchingProduct = products.find(p => p.sku === product.sku);
+            if (matchingProduct) {
+              productId = matchingProduct.id;
+            }
+          }
+          
+          if (!productId) {
+            throw new Error(`Could not identify product for return item: ${product.name || product.sku}`);
+          }
+          
+          // Validate data types
+          if (typeof quantity !== 'number' || quantity <= 0) {
+            throw new Error(`Invalid quantity for product ${product.name || product.sku}: ${quantity}`);
+          }
+          
+          if (typeof refund !== 'number' || refund < 0) {
+            throw new Error(`Invalid refund amount for product ${product.name || product.sku}: ${refund}`);
+          }
+          
+          return {
+            product_id: productId,
+            quantity: quantity,
+            refund_amount: refund
+          };
+        })
       };
       
+      // Validate the return data before sending
+      if (!returnData.order_id) {
+        throw new Error('Order ID is missing');
+      }
+      
+      if (!Array.isArray(returnData.items) || returnData.items.length === 0) {
+        throw new Error('No items to return');
+      }
+      
+      if (typeof returnData.refund_amount !== 'number' || returnData.refund_amount < 0) {
+        throw new Error('Invalid refund amount');
+      }
+      
+      console.log('Return data prepared:', returnData);
+      
       // Send to API
+      console.log('Sending return data to API');
       const createdReturn = await returnsApi.create(returnData);
+      console.log('Return created via API:', createdReturn);
       
       // Update product stock levels
       const updatedProducts = [...products];
       for (const item of items) {
-        const productIndex = updatedProducts.findIndex(p => p.id === item.product.id);
+        // Handle both data structures: with 'item' property or direct properties
+        const product = item.product || (item.item && item.item.product);
+        const quantity = item.quantity || (item.item && item.item.quantity) || 0;
+        
+        // Find the actual product ID from our products list
+        // This ensures we use the real database ID rather than just the SKU
+        let productId = product.id;
+        if (!productId && product.sku) {
+          // Try to find the product in our products list by SKU
+          const matchingProduct = products.find(p => p.sku === product.sku);
+          if (matchingProduct) {
+            productId = matchingProduct.id;
+          }
+        }
+        
+        if (!productId) {
+          console.error('Could not identify product for stock update:', product);
+          continue;
+        }
+        
+        const productIndex = updatedProducts.findIndex(p => p.id === productId);
         if (productIndex !== -1) {
           updatedProducts[productIndex] = {
             ...updatedProducts[productIndex],
-            stock: updatedProducts[productIndex].stock + item.quantity
+            stock: updatedProducts[productIndex].stock + quantity
           };
+          console.log('Updating product stock in database:', productId, 'New stock:', updatedProducts[productIndex].stock);
+          
           // Update product in database
-          await productsApi.update(item.product.id, {
-            stock: updatedProducts[productIndex].stock
-          });
+          try {
+            await productsApi.update(updatedProducts[productIndex].id, {
+              stock: updatedProducts[productIndex].stock
+            });
+            console.log('Product stock updated in database:', productId);
+          } catch (updateError) {
+            console.error('Failed to update product stock in database:', updateError);
+          }
         }
       }
       setProducts(updatedProducts);
       
-      // Add to returns list
-      setReturns(prev => [...prev, createdReturn]);
+      // Update the order status to "returned" to indicate it has been returned
+      try {
+        const updatedOrder = await ordersApi.update(orderId, { status: 'returned' });
+        console.log('Order status updated:', updatedOrder);
+        
+        // Update local orders state
+        setOrders(prev => prev.map(order => 
+          order.id === orderId ? convertOrderDataTypes(updatedOrder) : order
+        ));
+      } catch (orderError) {
+        console.error('Error updating order status:', orderError);
+      }
+      
+      // Reload orders to ensure we have the latest data
+      await reloadOrders();
+      
+      // Fetch updated returns list from backend instead of just adding to local state
+      await fetchReturns();
       
       return createdReturn;
     } catch (err) {
       console.error('Failed to process return:', err);
-      setError('Failed to process return');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError('Failed to process return: ' + errorMessage);
+      
+      // Show a more user-friendly error message
+      if (errorMessage.includes('Failed to process return')) {
+        // This is an error from our own error handling, show it as is
+        alert(errorMessage);
+      } else {
+        // This is an unexpected error, show a generic message
+        alert('Failed to process return. Please check the console for more details and try again.');
+      }
+      
       return null;
     }
   };
+
+  // Add function to fetch returns from backend
+  const fetchReturns = async () => {
+    try {
+      const fetchedReturns = await returnsApi.getAll();
+      setReturns(fetchedReturns);
+      return fetchedReturns;
+    } catch (err) {
+      console.error('Failed to fetch returns:', err);
+      setError('Failed to fetch returns: ' + (err as Error).message);
+      return [];
+    }
+  };
+
+  // Add function to clear all returns from backend
+  const clearReturns = async () => {
+    try {
+      const result = await returnsApi.clearAll();
+      console.log('Returns cleared:', result);
+      // Refresh returns data
+      await fetchReturns();
+      return result;
+    } catch (err) {
+      console.error('Failed to clear returns:', err);
+      setError('Failed to clear returns: ' + (err as Error).message);
+      return null;
+    }
+  };
+
+  // Add function to refresh all data
+  const refreshData = async () => {
+    try {
+      await reloadOrders();
+      await fetchReturns();
+    } catch (err) {
+      console.error('Failed to refresh data:', err);
+      setError('Failed to refresh data: ' + (err as Error).message);
+    }
+  };
+
+  // Fetch returns when the hook is initialized
+  useEffect(() => {
+    fetchReturns();
+  }, []); // Only run once on mount
 
   return {
     // State
@@ -811,6 +1012,9 @@ export function usePOSStore() {
     getCODOrders,
     processReturn,
     returns,
+    fetchReturns, // Export the fetchReturns function
+    clearReturns, // Export the clearReturns function
+    refreshData, // Export the refreshData function
     reloadOrders, // Export the reloadOrders function
 
     // Dashboard data

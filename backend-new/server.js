@@ -22,8 +22,8 @@ console.log('Returns router loaded:', !!returnsRouter);
 
 const app = express();
 
-// Use Vercel's PORT or default to 3001
-const PORT = process.env.PORT || 3001;
+// Use Vercel's PORT or default to 3003 (to avoid conflicts)
+const PORT = process.env.PORT || 3003;
 
 // Middleware
 app.use(cors({
@@ -46,7 +46,8 @@ app.use(cors({
     //   return callback(null, true);
     // }
     
-    // For now, allow all origins in development
+    // For now, allow all origins in development and production
+    console.log('Allowing origin:', origin);
     return callback(null, true);
   },
   credentials: true

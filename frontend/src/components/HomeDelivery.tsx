@@ -61,8 +61,9 @@ export function HomeDelivery({
     }
   };
 
-  // Filter COD orders
-  const codOrders = orders.filter(order => order.paymentMethod === 'cod');
+  // Filter COD orders that haven't been returned
+  const codOrders = orders.filter(order => order.paymentMethod === 'cod' && order.status !== 'returned');
+  console.log('HomeDelivery - COD orders count:', codOrders.length, 'Total orders:', orders.length);
 
   return (
     <div className="space-y-4">

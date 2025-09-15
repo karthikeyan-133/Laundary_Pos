@@ -14,20 +14,23 @@ const getApiBaseUrl = () => {
       return '';
     } else {
       // For local development
-      return 'http://localhost:3002';
+      return 'http://localhost:3000';
     }
   }
   // For server-side rendering, fallback to localhost
-  return 'http://localhost:3002';
+  return 'http://localhost:3000';
 };
 
 const API_BASE_URL = getApiBaseUrl();
+console.log('API base URL:', API_BASE_URL);
 
 // Helper function for API requests
 export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   // Ensure endpoint starts with /api
   const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
   const url = `${API_BASE_URL}${normalizedEndpoint}`;
+  
+  console.log(`Making API request to: ${url}`, options);
   
   const config: RequestInit = {
     headers: {
@@ -40,12 +43,25 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
   try {
     const response = await fetch(url, config);
     
+    console.log(`API response from ${url}:`, response.status, response.statusText);
+    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`API error from ${url}:`, errorText);
+      
+      // Try to parse the error as JSON
+      try {
+        const errorJson = JSON.parse(errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorJson.error || errorText}`);
+      } catch (parseError) {
+        // If parsing fails, use the raw error text
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log(`API success from ${url}:`, result);
+    return result;
   } catch (error) {
     console.error(`API request failed for ${url}:`, error);
     throw error;
@@ -169,7 +185,7 @@ type Order = {
   paymentMethod: 'cash' | 'card' | 'credit' | 'both' | 'cod';
   cashAmount?: number; // Add cash amount for split payments
   cardAmount?: number; // Add card amount for split payments
-  status: 'completed' | 'pending' | 'cancelled';
+  status: 'completed' | 'pending' | 'cancelled' | 'returned';
   deliveryStatus?: 'pending' | 'in-transit' | 'delivered';
   paymentStatus?: 'paid' | 'unpaid';
   createdAt: Date;

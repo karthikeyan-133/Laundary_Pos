@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { TrendingUp, Users, DollarSign, ShoppingBag, Calendar, Clock } from 'lucide-react';
+import { TrendingUp, Users, ShoppingBag, Calendar, Clock, Banknote } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Order, Product } from '@/types/pos';
@@ -25,6 +25,10 @@ export function Dashboard({ orders }: DashboardProps) {
     }
   }, [orders]);
 
+  // Filter out returned orders
+  const nonReturnedOrders = orders.filter(order => order.status !== 'returned');
+  console.log('Dashboard - Non-returned orders count:', nonReturnedOrders.length, 'Total orders:', orders.length);
+
   const { 
     openingCash, 
     getTodayOrders, 
@@ -34,18 +38,18 @@ export function Dashboard({ orders }: DashboardProps) {
     getClosingBalance
   } = usePOSStore();
 
-  // Calculate dashboard metrics using the orders prop
-  const todayOrders = getTodayOrders();
-  const todaySales = getTodaySales();
-  const totalOrders = orders.length;
-  const averageOrderValue = orders.length > 0 ? orders.reduce((sum, order) => sum + order.total, 0) / orders.length : 0;
+  // Calculate dashboard metrics using the filtered orders
+  const todayOrders = getTodayOrders(nonReturnedOrders);
+  const todaySales = getTodaySales(nonReturnedOrders);
+  const totalOrders = nonReturnedOrders.length;
+  const averageOrderValue = nonReturnedOrders.length > 0 ? nonReturnedOrders.reduce((sum, order) => sum + order.total, 0) / nonReturnedOrders.length : 0;
   
-  const recentOrders = orders.slice(0, 5);
+  const recentOrders = nonReturnedOrders.slice(0, 5);
 
   // Calculate top products
   const productSales: { [key: string]: { product: Product, quantity: number, revenue: number } } = {};
   
-  orders.forEach(order => {
+  nonReturnedOrders.forEach(order => {
     // Add safety check for order.items
     if (order.items && Array.isArray(order.items)) {
       order.items.forEach(item => {
@@ -87,12 +91,16 @@ export function Dashboard({ orders }: DashboardProps) {
       return 'Invalid Date';
     }
     
+    // Adjust for Dubai time (UTC+4)
+    const dubaiTime = new Date(dateObj.getTime() + (4 * 60 * 60 * 1000));
+    
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    }).format(dateObj);
+      minute: '2-digit',
+      timeZone: 'Asia/Dubai'
+    }).format(dubaiTime);
   };
 
   const getStatusBadgeVariant = (status: Order['status']) => {
@@ -107,13 +115,13 @@ export function Dashboard({ orders }: DashboardProps) {
   return (
     <div className="space-y-6">
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Opening Cash
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">AED {openingCash.toFixed(2)}</div>
@@ -128,7 +136,7 @@ export function Dashboard({ orders }: DashboardProps) {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Today's Collection
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-success" />
+            <Banknote className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">AED {todaySales.toFixed(2)}</div>
@@ -143,10 +151,10 @@ export function Dashboard({ orders }: DashboardProps) {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Closing Balance
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
+            <Banknote className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">AED {getClosingBalance().toFixed(2)}</div>
+            <div className="text-2xl font-bold text-primary">AED {getClosingBalance(nonReturnedOrders).toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
               Opening + Today's sales
             </p>
@@ -161,7 +169,7 @@ export function Dashboard({ orders }: DashboardProps) {
             <ShoppingBag className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">{getTodayProducts()}</div>
+            <div className="text-2xl font-bold text-warning">{getTodayProducts(nonReturnedOrders)}</div>
             <p className="text-xs text-muted-foreground">
               Unique products sold
             </p>
@@ -176,7 +184,7 @@ export function Dashboard({ orders }: DashboardProps) {
             <Users className="h-4 w-4 text-accent-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-accent-foreground">{getTodayCustomers()}</div>
+            <div className="text-2xl font-bold text-accent-foreground">{getTodayCustomers(nonReturnedOrders)}</div>
             <p className="text-xs text-muted-foreground">
               Unique customers
             </p>

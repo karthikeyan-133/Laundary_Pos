@@ -1,63 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, RotateCcw, Filter } from 'lucide-react';
+import { Search, RotateCcw, Filter, Printer, Eye } from 'lucide-react';
 import { usePOSStore } from '@/hooks/usePOSStore';
 import { Order } from '@/types/pos';
 
-export function ReturnByBills() {
-  const { orders } = usePOSStore();
+interface ReturnRecord {
+  date: string;
+  time: string;
+  orderId: string;
+  productCode: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+  status: string;
+}
+
+interface ReturnByBillsProps {
+  returns?: any[];
+  onReturnProcessed?: (orderId: string, items: Record<string, number>, reason: string) => void;
+  onViewReceipt?: (order: Order) => void;
+  onPrintReceipt?: (order: Order) => void;
+}
+
+export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt }: ReturnByBillsProps) {
+  const { orders, processReturn, settings, returns, fetchReturns, refreshData, reloadOrders } = usePOSStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [returnItems, setReturnItems] = useState<Record<string, number>>({});
+  const [returnReason, setReturnReason] = useState<string>('');
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [returnType, setReturnType] = useState<'complete' | 'partial' | null>(null);
+
+  // Fetch returns when component mounts
+  useEffect(() => {
+    refreshData();
+  }, []); // Only run once on mount
 
   // Filter orders based on search term and date range
-  const filterOrders = () => {
-    let filtered = orders.filter(order => 
+  useEffect(() => {
+    console.log('Filtering orders with:', { searchTerm, fromDate, toDate, allOrders: orders });
+    
+    // Filter out orders that have been returned (have status 'returned')
+    let filtered = orders.filter(order => order.status !== 'returned');
+    
+    // Apply search filter
+    filtered = filtered.filter(order => 
       order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.name.toLowerCase().includes(searchTerm.toLowerCase())
+      (order.customer && order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
+    
+    console.log('After search filter:', filtered.length);
     
     // Apply date range filter
     if (fromDate || toDate) {
       filtered = filtered.filter(order => {
-        const orderDate = new Date(order.createdAt);
-        const from = fromDate ? new Date(fromDate) : null;
-        const to = toDate ? new Date(toDate) : null;
-        
-        // Set time to end of day for toDate comparison
-        if (to) {
-          to.setHours(23, 59, 59, 999);
+        try {
+          const orderDate = new Date(order.createdAt);
+          const from = fromDate ? new Date(fromDate) : null;
+          const to = toDate ? new Date(toDate) : null;
+          
+          // Set time to end of day for toDate comparison
+          if (to) {
+            to.setHours(23, 59, 59, 999);
+          }
+          
+          const result = (
+            (!from || orderDate >= from) &&
+            (!to || orderDate <= to)
+          );
+          
+          console.log('Date filter for order', order.id, ':', orderDate, 'From:', from, 'To:', to, 'Result:', result);
+          return result;
+        } catch (err) {
+          console.error('Error filtering order by date:', order.id, err);
+          return false;
         }
-        
-        return (
-          (!from || orderDate >= from) &&
-          (!to || orderDate <= to)
-        );
       });
     }
     
-    return filtered;
-  };
-
-  const filteredOrders = filterOrders();
+    console.log('Final filtered orders:', filtered.length);
+    setFilteredOrders(filtered);
+  }, [searchTerm, fromDate, toDate, orders]);
 
   const handleSelectOrder = (order: Order) => {
+    console.log('Selecting order:', order);
     setSelectedOrder(order);
     // Initialize return quantities to 0 for all items
     const initialReturnItems: Record<string, number> = {};
-    // Add safety check for order.items
     if (order.items && Array.isArray(order.items)) {
       order.items.forEach(item => {
         initialReturnItems[item.id] = 0;
       });
     }
     setReturnItems(initialReturnItems);
+    setReturnType(null);
   };
 
   const handleReturnQuantityChange = (itemId: string, quantity: number) => {
@@ -73,28 +116,354 @@ export function ReturnByBills() {
   const calculateReturnTotal = () => {
     if (!selectedOrder) return 0;
     
-    // Add safety check for selectedOrder.items
     if (!selectedOrder.items || !Array.isArray(selectedOrder.items)) return 0;
     
     return selectedOrder.items.reduce((total, item) => {
       const returnQuantity = returnItems[item.id] || 0;
-      return total + (returnQuantity * item.product.price * (1 - item.discount / 100));
+      const itemTotal = (returnQuantity * item.product.price * (1 - item.discount / 100));
+      return total + itemTotal;
     }, 0);
   };
 
-  const handleProcessReturn = () => {
-    if (!selectedOrder) return;
+  const handleProcessReturn = async () => {
+    if (!selectedOrder) {
+      console.log('No order selected');
+      return;
+    }
     
-    // In a real application, this would process the return
     console.log('Processing return for order:', selectedOrder.id);
-    console.log('Return items:', returnItems);
     
-    alert(`Return processed for order ${selectedOrder.id}. Total refund: AED ${calculateReturnTotal().toFixed(2)}`);
+    // Prepare items for return
+    const itemsToReturn = selectedOrder.items
+      .filter(item => (returnItems[item.id] || 0) > 0)
+      .map(item => ({
+        product: item.product,
+        quantity: returnItems[item.id] || 0,
+        discount: item.discount
+      }));
     
-    // Reset selection
-    setSelectedOrder(null);
-    setReturnItems({});
+    console.log('Items to return:', itemsToReturn);
+    
+    if (itemsToReturn.length === 0) {
+      alert('Please select at least one item to return');
+      return;
+    }
+    
+    // Process the return
+    const result = await processReturn(selectedOrder.id, itemsToReturn, returnReason);
+    
+    if (result) {
+      // Refresh returns data
+      await fetchReturns();
+      
+      // Refresh orders data to update the UI
+      await reloadOrders();
+      
+      // Call the callback if provided
+      if (onReturnProcessed) {
+        onReturnProcessed(selectedOrder.id, returnItems, returnReason);
+      }
+      
+      // Reset selection
+      setSelectedOrder(null);
+      setReturnItems({});
+      setReturnReason('');
+      setReturnType(null);
+    } else {
+      // The error message is now handled in the processReturn function
+      // Just reset the selection
+      setSelectedOrder(null);
+      setReturnItems({});
+      setReturnReason('');
+      setReturnType(null);
+    }
   };
+
+  // Format date and time
+  const formatDateTime = (date: Date | string) => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) {
+        return { dateStr: 'Invalid Date', timeStr: 'Invalid Time' };
+      }
+      // Adjust for Dubai time (UTC+4)
+      const dubaiTime = new Date(d.getTime() + (4 * 60 * 60 * 1000));
+      const dateStr = dubaiTime.toLocaleDateString('en-US', { 
+        timeZone: 'Asia/Dubai',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      const timeStr = dubaiTime.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: true,
+        timeZone: 'Asia/Dubai'
+      });
+      return { dateStr, timeStr };
+    } catch (err) {
+      console.error('Error formatting date:', date, err);
+      return { dateStr: 'Invalid Date', timeStr: 'Invalid Time' };
+    }
+  };
+
+  // Handle return type selection
+  const handleReturnTypeSelect = (type: 'complete' | 'partial') => {
+    setReturnType(type);
+    
+    if (type === 'complete' && selectedOrder) {
+      // For complete return, set all items to their full quantity
+      const completeReturnItems: Record<string, number> = {};
+      if (selectedOrder.items && Array.isArray(selectedOrder.items)) {
+        selectedOrder.items.forEach(item => {
+          completeReturnItems[item.id] = item.quantity;
+        });
+      }
+      setReturnItems(completeReturnItems);
+      
+      // For complete return, directly process the return without showing item selection
+      setReturnReason('Complete Return');
+      // We'll process the return immediately after a short delay to allow state to update
+      setTimeout(() => {
+        handleProcessReturn();
+      }, 100);
+    }
+  };
+
+  // Generate receipt for return
+  const generateReturnReceipt = (order: Order) => {
+    if (!settings) {
+      console.error('Settings not available for receipt generation');
+      return;
+    }
+
+    const receiptContent = `
+      <html>
+        <head>
+          <title>Return Receipt - ${order.id}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 10px;
+              width: 4in;
+              max-width: 4in;
+            }
+            .receipt-header { 
+              text-align: center; 
+              margin-bottom: 10px; 
+            }
+            .receipt-title { 
+              font-size: 18px; 
+              font-weight: bold; 
+              margin-bottom: 5px;
+            }
+            .receipt-info { 
+              margin-bottom: 10px; 
+              font-size: 12px;
+            }
+            .receipt-items { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 10px; 
+              font-size: 12px;
+            }
+            .receipt-items th, .receipt-items td { 
+              padding: 4px 2px; 
+              text-align: left; 
+            }
+            .receipt-items th { 
+              border-bottom: 1px solid #000;
+              font-size: 12px;
+            }
+            .receipt-totals { 
+              width: 100%; 
+              border-collapse: collapse; 
+              font-size: 12px;
+            }
+            .receipt-totals td { 
+              padding: 2px; 
+              text-align: right; 
+            }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .mb-5 { margin-bottom: 5px; }
+            .mt-10 { margin-top: 10px; }
+            .divider { 
+              border-top: 1px dashed #000; 
+              margin: 5px 0; 
+            }
+            .item-name {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              max-width: 80px;
+            }
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 3px;
+            }
+            .item-details {
+              flex: 1;
+            }
+            .item-amount {
+              text-align: right;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-header">
+            <div class="receipt-title">${settings.businessName}</div>
+            <div style="font-size: 12px;">${settings.businessAddress}</div>
+            <div style="font-size: 12px;">Phone: ${settings.businessPhone}</div>
+            <div class="divider"></div>
+            <div><strong>RETURN RECEIPT</strong></div>
+          </div>
+          
+          <div class="receipt-info">
+            <div>Order ID: ${order.id}</div>
+            <div>Date: ${new Date(order.createdAt).toLocaleString()}</div>
+            <div>Customer: ${order.customer?.name || 'N/A'}</div>
+          </div>
+          
+          <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
+            <strong>Returned Items:</strong>
+          </div>
+          
+          <div>
+            ${order.items
+              .filter(item => (returnItems[item.id] || 0) > 0)
+              .map(item => {
+                const returnQuantity = returnItems[item.id] || 0;
+                const returnSubtotal = returnQuantity * item.product.price * (1 - item.discount / 100);
+                return `
+                  <div class="item-row">
+                    <div class="item-details">
+                      <div class="item-name">${item.product.name}</div>
+                      <div>${returnQuantity} × ${settings.currency}${item.product.price.toFixed(2)}</div>
+                    </div>
+                    <div class="item-amount">${settings.currency}${returnSubtotal.toFixed(2)}</div>
+                  </div>
+                `;
+              }).join('')}
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div>
+            <div class="item-row" style="font-weight: bold; font-size: 14px;">
+              <div>Total Refund:</div>
+              <div>${settings.currency}${calculateReturnTotal().toFixed(2)}</div>
+            </div>
+          </div>
+          
+          <div class="text-center mt-10" style="font-size: 12px;">
+            <p>Thank you!</p>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onfocus = function() { 
+                setTimeout(function() { window.close(); }, 500); 
+              }
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (printWindow) {
+      printWindow.document.write(receiptContent);
+      printWindow.document.close();
+    }
+  };
+
+  // Format return records from backend data
+  const formatReturnRecords = () => {
+    // First, deduplicate the returns by ID
+    const uniqueReturns = returns.filter((returnRecord, index, self) => 
+      index === self.findIndex(r => r.id === returnRecord.id)
+    );
+    
+    const formattedRecords: any[] = [];
+    
+    // Group return items by order ID to avoid duplication
+    const returnsByOrder: Record<string, any[]> = {};
+    
+    uniqueReturns.forEach(returnRecord => {
+      const orderId = returnRecord.order_id;
+      if (!returnsByOrder[orderId]) {
+        returnsByOrder[orderId] = [];
+      }
+      returnsByOrder[orderId].push(returnRecord);
+    });
+    
+    // Process each order's returns
+    Object.entries(returnsByOrder).forEach(([orderId, orderReturns]) => {
+      // Use the most recent return record for this order
+      const latestReturn = orderReturns.reduce((latest, current) => {
+        return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
+      });
+      
+      // Get the order for this return
+      const order = orders.find(o => o.id === orderId);
+      
+      // Format date and time
+      const createdAt = new Date(latestReturn.created_at);
+      // Adjust for Dubai time (UTC+4)
+      const dubaiTime = new Date(createdAt.getTime() + (4 * 60 * 60 * 1000));
+      const dateStr = `${dubaiTime.getDate().toString().padStart(2, '0')}-${(dubaiTime.getMonth() + 1).toString().padStart(2, '0')}-${dubaiTime.getFullYear()}`;
+      const timeStr = dubaiTime.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true,
+        timeZone: 'Asia/Dubai'
+      });
+      
+      // Process return items and group them by order
+      const items = latestReturn.return_items || [];
+      
+      // Calculate totals for the entire return
+      let totalQuantity = 0;
+      let totalRefund = 0;
+      let itemDetails: string[] = [];
+      
+      items.forEach((item: any) => {
+        const product = item.products || {};
+        const quantity = item.quantity || 0;
+        const refund = item.refund_amount || 0;
+        
+        totalQuantity += quantity;
+        totalRefund += refund;
+        itemDetails.push(`${product.name || 'Unknown Product'} (${quantity})`);
+      });
+      
+      // Calculate average price
+      const avgPrice = totalQuantity > 0 ? totalRefund / totalQuantity : 0;
+      
+      // Create a single record per order
+      formattedRecords.push({
+        id: latestReturn.id,
+        date: dateStr,
+        time: timeStr,
+        orderId: orderId.slice(-6),
+        productName: itemDetails.join(', '),
+        quantity: totalQuantity,
+        price: avgPrice,
+        subtotal: totalRefund,
+        status: 'completed',
+        returnId: latestReturn.id,
+        orderIdFull: orderId
+      });
+    });
+    
+    return formattedRecords;
+  };
+
+  const returnRecords = formatReturnRecords();
 
   return (
     <div className="space-y-6">
@@ -147,6 +516,15 @@ export function ReturnByBills() {
           <CardTitle className="flex items-center gap-2">
             <RotateCcw className="h-5 w-5" />
             Return by Bills
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchReturns}
+              className="ml-auto"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -167,35 +545,43 @@ export function ReturnByBills() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Item Count</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.length > 0 ? (
-                    filteredOrders.map(order => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.id}</TableCell>
-                        <TableCell>{order.customer.name || 'N/A'}</TableCell>
-                        <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell>AED {order.total.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleSelectOrder(order)}
-                          >
-                            Select
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    filteredOrders.map(order => {
+                      const { dateStr, timeStr } = formatDateTime(order.createdAt);
+                      const itemCount = order.items ? order.items.length : 0;
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell>{dateStr}</TableCell>
+                          <TableCell>{timeStr}</TableCell>
+                          <TableCell>{order.id}</TableCell>
+                          <TableCell>{itemCount}</TableCell>
+                          <TableCell>{order.status}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleSelectOrder(order)}
+                              >
+                                Select
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-gray-500">
+                      <TableCell colSpan={6} className="text-center text-gray-500">
                         No orders found for selected criteria
                       </TableCell>
                     </TableRow>
@@ -203,13 +589,17 @@ export function ReturnByBills() {
                 </TableBody>
               </Table>
             </div>
-          ) : (
+          ) : returnType === null ? (
+            // Return type selection
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">Order Details: {selectedOrder.id}</h3>
                 <Button 
                   variant="outline" 
-                  onClick={() => setSelectedOrder(null)}
+                  onClick={() => {
+                    setSelectedOrder(null);
+                    setReturnType(null);
+                  }}
                 >
                   Back to Orders
                 </Button>
@@ -217,49 +607,121 @@ export function ReturnByBills() {
               
               <div className="border rounded-lg p-4">
                 <h4 className="font-medium mb-2">Customer Information</h4>
-                <p>{selectedOrder.customer.name || 'N/A'}</p>
+                <p>{selectedOrder.customer?.name || 'N/A'}</p>
               </div>
+              
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium mb-2">Return Options</h4>
+                <p className="mb-4">Select return type for Order #{selectedOrder.id.slice(-6)}</p>
+                <div className="flex flex-col gap-3">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleReturnTypeSelect('complete')}
+                  >
+                    Completely Return
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleReturnTypeSelect('partial')}
+                  >
+                    Partially Return
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setSelectedOrder(null);
+                      setReturnType(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Return item selection
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Order Details: {selectedOrder.id}</h3>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSelectedOrder(null);
+                    setReturnType(null);
+                    setReturnItems({});
+                  }}
+                >
+                  Back to Orders
+                </Button>
+              </div>
+              
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium mb-2">Customer Information</h4>
+                <p>{selectedOrder.customer?.name || 'N/A'}</p>
+              </div>
+              
+              {/* Return reason input */}
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="return-reason">Return Reason</Label>
+                    <Input
+                      id="return-reason"
+                      value={returnReason}
+                      onChange={(e) => setReturnReason(e.target.value)}
+                      placeholder="Enter reason for return (optional)"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
               
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Item ID</TableHead>
                     <TableHead>Quantity</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Discount</TableHead>
-                    <TableHead>Subtotal</TableHead>
+                    <TableHead>Product Code</TableHead>
+                    <TableHead>Product Name</TableHead>
                     <TableHead>Return Qty</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {selectedOrder.items && Array.isArray(selectedOrder.items) ? (
-                    selectedOrder.items.map(item => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{item.product.name}</div>
-                            <div className="text-sm text-gray-500">{item.product.sku}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{item.quantity}</TableCell>
-                        <TableCell>AED {item.product.price.toFixed(2)}</TableCell>
-                        <TableCell>{item.discount}%</TableCell>
-                        <TableCell>AED {item.subtotal.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            max={item.quantity}
-                            value={returnItems[item.id] || 0}
-                            onChange={(e) => handleReturnQuantityChange(item.id, parseInt(e.target.value) || 0)}
-                            className="w-20"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    selectedOrder.items.map(item => {
+                      const { dateStr, timeStr } = formatDateTime(selectedOrder.createdAt);
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>{dateStr}</TableCell>
+                          <TableCell>{timeStr}</TableCell>
+                          <TableCell>{selectedOrder.id}</TableCell>
+                          <TableCell>{item.id}</TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{item.product.sku}</TableCell>
+                          <TableCell>{item.product.name}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min="0"
+                              max={item.quantity}
+                              value={returnItems[item.id] || 0}
+                              onChange={(e) => handleReturnQuantityChange(item.id, parseInt(e.target.value) || 0)}
+                              className="w-20"
+                              disabled={returnType === 'complete'}
+                            />
+                          </TableCell>
+                          <TableCell>{settings?.currency} {item.product.price.toFixed(2)}</TableCell>
+                          <TableCell>Return Request Initiated</TableCell>
+                        </TableRow>
+                      );
+                    })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-gray-500">
+                      <TableCell colSpan={10} className="text-center text-gray-500">
                         No items found for this order
                       </TableCell>
                     </TableRow>
@@ -270,17 +732,112 @@ export function ReturnByBills() {
               <div className="flex justify-between items-center border-t pt-4">
                 <div>
                   <p className="text-lg font-semibold">
-                    Return Total: AED {calculateReturnTotal().toFixed(2)}
+                    Return Total: {settings?.currency} {calculateReturnTotal().toFixed(2)}
                   </p>
                 </div>
-                <Button onClick={handleProcessReturn}>
-                  Process Return
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => generateReturnReceipt(selectedOrder)}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Receipt
+                  </Button>
+                  <Button onClick={handleProcessReturn}>
+                    Process Return
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Return Records Section */}
+      {returnRecords.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5" />
+              Return Records
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchReturns}
+                className="ml-auto"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Avg Price</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {returnRecords.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>{record.date}</TableCell>
+                    <TableCell>{record.time}</TableCell>
+                    <TableCell>{record.orderId}</TableCell>
+                    <TableCell>{record.productName}</TableCell>
+                    <TableCell>{record.quantity}</TableCell>
+                    <TableCell>{settings?.currency} {record.price.toFixed(2)}</TableCell>
+                    <TableCell>{settings?.currency} {record.subtotal.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                        {record.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const order = orders.find(o => o.id === record.orderIdFull);
+                            if (order && onPrintReceipt) {
+                              onPrintReceipt(order);
+                            }
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const order = orders.find(o => o.id === record.orderIdFull);
+                            if (order && onViewReceipt) {
+                              onViewReceipt(order);
+                            }
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
