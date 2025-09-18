@@ -43,6 +43,14 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
     refreshData();
   }, []); // Only run once on mount
 
+  // Set today's date as default
+  useEffect(() => {
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    setFromDate(todayString);
+    setToDate(todayString);
+  }, []);
+
   // Filter orders based on search term and date range
   useEffect(() => {
     console.log('Filtering orders with:', { searchTerm, fromDate, toDate, allOrders: orders });
@@ -65,6 +73,11 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
           const orderDate = new Date(order.createdAt);
           const from = fromDate ? new Date(fromDate) : null;
           const to = toDate ? new Date(toDate) : null;
+          
+          // Set time to start of day for fromDate comparison
+          if (from) {
+            from.setHours(0, 0, 0, 0);
+          }
           
           // Set time to end of day for toDate comparison
           if (to) {
@@ -159,9 +172,13 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
       // Refresh orders data to update the UI
       await reloadOrders();
       
-      // Call the callback if provided
+      // Show success message
+      alert('Return processed successfully!');
+      
+      // Call the callback if provided (but don't navigate to receipt view)
       if (onReturnProcessed) {
-        onReturnProcessed(selectedOrder.id, returnItems, returnReason);
+        // Pass empty string as the order ID to indicate we don't want to show the receipt
+        onReturnProcessed('', returnItems, returnReason);
       }
       
       // Reset selection
@@ -223,10 +240,10 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
       
       // For complete return, directly process the return without showing item selection
       setReturnReason('Complete Return');
-      // We'll process the return immediately after a short delay to allow state to update
-      setTimeout(() => {
-        handleProcessReturn();
-      }, 100);
+      // Instead of automatically processing, let the user click the Process Return button
+      // setTimeout(() => {
+      //   handleProcessReturn();
+      // }, 100);
     }
   };
 
@@ -460,6 +477,37 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
       });
     });
     
+    // Apply date filtering to return records
+    if (fromDate || toDate) {
+      return formattedRecords.filter(record => {
+        try {
+          const recordDate = new Date(`${record.date.split('-')[2]}-${record.date.split('-')[1]}-${record.date.split('-')[0]}`);
+          const from = fromDate ? new Date(fromDate) : null;
+          const to = toDate ? new Date(toDate) : null;
+          
+          // Set time to start of day for fromDate comparison
+          if (from) {
+            from.setHours(0, 0, 0, 0);
+          }
+          
+          // Set time to end of day for toDate comparison
+          if (to) {
+            to.setHours(23, 59, 59, 999);
+          }
+          
+          const result = (
+            (!from || recordDate >= from) &&
+            (!to || recordDate <= to)
+          );
+          
+          return result;
+        } catch (err) {
+          console.error('Error filtering return record by date:', record, err);
+          return false;
+        }
+      });
+    }
+    
     return formattedRecords;
   };
 
@@ -499,6 +547,20 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
               <Button 
                 variant="outline" 
                 onClick={() => {
+                  const today = new Date();
+                  const todayString = today.toISOString().split('T')[0];
+                  setFromDate(todayString);
+                  setToDate(todayString);
+                  setSearchTerm('');
+                }}
+              >
+                Today
+              </Button>
+            </div>
+            <div className="flex items-end">
+              <Button 
+                variant="outline" 
+                onClick={() => {
                   setFromDate('');
                   setToDate('');
                   setSearchTerm('');
@@ -519,7 +581,7 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={fetchReturns}
+              onClick={() => fetchReturns()}
               className="ml-auto"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
@@ -636,6 +698,14 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
                     Cancel
                   </Button>
                 </div>
+                {returnType === 'complete' && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-blue-800">
+                      <strong>Note:</strong> All items have been selected for return. 
+                      Please click "Process Return" button below to complete the return process.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

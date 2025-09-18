@@ -130,6 +130,14 @@ const Index = () => {
   // Callback function for when a return is processed successfully
   const handleReturnProcessed = (orderId: string, items: Record<string, number>, reason: string) => {
     console.log('Return processed for order:', orderId, 'Items:', items, 'Reason:', reason);
+    
+    // If orderId is empty string, it means we don't want to show the receipt view
+    if (orderId === '' || !orderId) {
+      // Just stay on the current view and refresh the data
+      // The components will automatically refresh their data
+      return;
+    }
+    
     setProcessedOrderId(orderId);
     setReturnItems(items);
     setReturnReason(reason);
@@ -255,6 +263,7 @@ const Index = () => {
                     products={products}
                     onAddToCart={addToCart}
                     onSearch={searchProducts}
+                    onAddProduct={() => setActiveView('product-management')}
                   />
                 </CardContent>
               </Card>
@@ -341,50 +350,6 @@ const Index = () => {
             }
           </div>
         )}
-
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveView('pos')}>
-            <CardContent className="p-4 text-center">
-              <FileText className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">New Sale</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveView('receipt')}>
-            <CardContent className="p-4 text-center">
-              <ReceiptIcon className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">Last Receipt</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveView('dashboard')}>
-            <CardContent className="p-4 text-center">
-              <BarChart3 className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">Reports</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveView('home-delivery')}>
-            <CardContent className="p-4 text-center">
-              <Truck className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">Home Delivery</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveView('return-bills')}>
-            <CardContent className="p-4 text-center">
-              <RotateCcw className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">Return</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveView('product-management')}>
-            <CardContent className="p-4 text-center">
-              <PlusSquare className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-medium">Products</p>
-            </CardContent>
-          </Card>
-        </div>
 
         {activeView === 'receipt' && (
           <div className="mt-6">

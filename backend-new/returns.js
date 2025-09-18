@@ -171,9 +171,9 @@ router.post('/', async (req, res) => {
 
 // Get all returns
 router.get('/', async (req, res) => {
-  console.log('GET /api/returns called');
+  console.log('GET /api/returns called with query params:', req.query);
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('returns')
       .select(`
         *,
@@ -187,6 +187,25 @@ router.get('/', async (req, res) => {
         )
       `)
       .order('created_at', { ascending: false });
+    
+    // Apply date filtering if provided
+    const { from_date, to_date } = req.query;
+    
+    if (from_date) {
+      // Set time to start of day for from_date
+      const fromDate = new Date(from_date);
+      fromDate.setHours(0, 0, 0, 0);
+      query = query.gte('created_at', fromDate.toISOString());
+    }
+    
+    if (to_date) {
+      // Set time to end of day for to_date
+      const toDate = new Date(to_date);
+      toDate.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', toDate.toISOString());
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error('Error fetching returns:', error);

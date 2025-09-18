@@ -46,6 +46,21 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
     refreshData();
   }, []); // Only run once on mount
 
+  // Refresh data when returns or orders change
+  useEffect(() => {
+    // This will run whenever the component re-renders
+    // which should happen after data updates
+    console.log('Data refresh triggered');
+  });
+
+  // Set today's date as default
+  useEffect(() => {
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    setFromDate(todayString);
+    setToDate(todayString);
+  }, []);
+
   // Filter orders based on search term, date range, and return status
   useEffect(() => {
     console.log('useEffect triggered with:', { preselectedOrder, fromDate, toDate, allOrders: orders });
@@ -67,6 +82,11 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
           const orderDate = new Date(order.createdAt);
           const from = fromDate ? new Date(fromDate) : null;
           const to = toDate ? new Date(toDate) : null;
+          
+          // Set time to start of day for fromDate comparison
+          if (from) {
+            from.setHours(0, 0, 0, 0);
+          }
           
           // Set time to end of day for toDate comparison
           if (to) {
@@ -148,10 +168,10 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
         // For complete return, directly process the return without showing item selection
         if (initialReturnType === 'complete') {
           setReturnReason('Complete Return');
-          // Process the return immediately after a short delay to allow state to update
-          setTimeout(() => {
-            handleProcessReturn();
-          }, 100);
+          // Instead of automatically processing, let the user click the Process Return button
+          // setTimeout(() => {
+          //   handleProcessReturn();
+          // }, 100);
         }
         
         // Clear the message after 5 seconds
@@ -210,7 +230,7 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
           const returnItems = returnRecord.return_items || [];
           return returnItems.some((returnItem: any) => {
             // Match by product ID or SKU
-            const returnProduct = returnItem.products || {};
+            const returnProduct = returnItem.products || returnItem.product || {};
             const itemProduct = item.product;
             
             // Check if product IDs match or SKUs match
@@ -320,23 +340,27 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
       // Refresh orders data to update the UI
       await reloadOrders();
       
+      // Force a complete data refresh
+      await refreshData();
+      
       // Convert selectedItems to returnItems format for the callback
       const returnItems: Record<string, number> = {};
       Object.entries(selectedItems).forEach(([key, { item, quantity }]) => {
         returnItems[item.id] = quantity;
       });
       
-      // Call the callback to navigate to receipt view
-      if (onReturnProcessed && processedOrderId) {
-        onReturnProcessed(processedOrderId, returnItems, returnReason);
-      } else {
-        // Show print option only after successful return processing
-        generateReturnReceipt();
-      }
+      // Show success message
+      alert('Return processed successfully!');
       
       // Reset selection
       setSelectedItems({});
       setReturnReason('');
+      
+      // Call the callback if provided (but don't navigate to receipt view)
+      if (onReturnProcessed && processedOrderId) {
+        // Pass empty string as the order ID to indicate we don't want to show the receipt
+        onReturnProcessed('', returnItems, returnReason);
+      }
     } else {
       // The error message is now handled in the processReturn function
       // Just reset the selection
@@ -545,29 +569,15 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
     
     const formattedRecords: any[] = [];
     
-    // Group return items by order ID to avoid duplication
-    const returnsByOrder: Record<string, any[]> = {};
-    
+    // Process each return record
     uniqueReturns.forEach(returnRecord => {
       const orderId = returnRecord.order_id;
-      if (!returnsByOrder[orderId]) {
-        returnsByOrder[orderId] = [];
-      }
-      returnsByOrder[orderId].push(returnRecord);
-    });
-    
-    // Process each order's returns
-    Object.entries(returnsByOrder).forEach(([orderId, orderReturns]) => {
-      // Use the most recent return record for this order
-      const latestReturn = orderReturns.reduce((latest, current) => {
-        return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-      });
       
       // Get the order for this return
       const order = orders.find(o => o.id === orderId);
       
       // Format date and time
-      const createdAt = new Date(latestReturn.created_at);
+      const createdAt = new Date(returnRecord.created_at);
       // Adjust for Dubai time (UTC+4)
       const dubaiTime = new Date(createdAt.getTime() + (4 * 60 * 60 * 1000));
       const dateStr = `${dubaiTime.getDate().toString().padStart(2, '0')}-${(dubaiTime.getMonth() + 1).toString().padStart(2, '0')}-${dubaiTime.getFullYear()}`;
@@ -578,8 +588,8 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
         timeZone: 'Asia/Dubai'
       });
       
-      // Process return items and group them by order
-      const items = latestReturn.return_items || [];
+      // Process return items
+      const items = returnRecord.return_items || [];
       
       // Calculate totals for the entire return
       let totalQuantity = 0;
@@ -587,7 +597,8 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
       let itemDetails: string[] = [];
       
       items.forEach((item: any) => {
-        const product = item.products || {};
+        // Handle both 'products' and 'product' field names
+        const product = item.products || item.product || {};
         const quantity = item.quantity || 0;
         const refund = item.refund_amount || 0;
         
@@ -599,9 +610,9 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
       // Calculate average price
       const avgPrice = totalQuantity > 0 ? totalRefund / totalQuantity : 0;
       
-      // Create a single record per order
+      // Create a record for this return
       formattedRecords.push({
-        id: latestReturn.id,
+        id: returnRecord.id,
         date: dateStr,
         time: timeStr,
         orderId: orderId.slice(-6),
@@ -610,10 +621,41 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
         price: avgPrice,
         subtotal: totalRefund,
         status: 'completed',
-        returnId: latestReturn.id,
+        returnId: returnRecord.id,
         orderIdFull: orderId
       });
     });
+    
+    // Apply date filtering to return records
+    if (fromDate || toDate) {
+      return formattedRecords.filter(record => {
+        try {
+          const recordDate = new Date(`${record.date.split('-')[2]}-${record.date.split('-')[1]}-${record.date.split('-')[0]}`);
+          const from = fromDate ? new Date(fromDate) : null;
+          const to = toDate ? new Date(toDate) : null;
+          
+          // Set time to start of day for fromDate comparison
+          if (from) {
+            from.setHours(0, 0, 0, 0);
+          }
+          
+          // Set time to end of day for toDate comparison
+          if (to) {
+            to.setHours(23, 59, 59, 999);
+          }
+          
+          const result = (
+            (!from || recordDate >= from) &&
+            (!to || recordDate <= to)
+          );
+          
+          return result;
+        } catch (err) {
+          console.error('Error filtering return record by date:', record, err);
+          return false;
+        }
+      });
+    }
     
     return formattedRecords;
   };
@@ -650,6 +692,20 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
                 />
+              </div>
+              <div className="flex items-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    const today = new Date();
+                    const todayString = today.toISOString().split('T')[0];
+                    setFromDate(todayString);
+                    setToDate(todayString);
+                    setSearchTerm('');
+                  }}
+                >
+                  Today
+                </Button>
               </div>
               <div className="flex items-end">
                 <Button 
@@ -700,6 +756,16 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
           <span className="block sm:inline">{preSelectionMessage}</span>
         </div>
       )}
+      
+      {/* Note for complete return */}
+      {initialReturnType === 'complete' && preselectedOrder && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-blue-800">
+            <strong>Note:</strong> All items have been pre-selected for return. 
+            Please click "Process Return" button below to complete the return process.
+          </p>
+        </div>
+      )}
 
       {/* Return mode message */}
       {preselectedOrder && (
@@ -736,7 +802,7 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={fetchReturns}
+              onClick={() => fetchReturns()}
               className="ml-auto"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
@@ -910,7 +976,7 @@ export function ReturnByItems({ preselectedOrder, returnType: initialReturnType,
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={fetchReturns}
+                onClick={() => fetchReturns()}
                 className="ml-auto"
               >
                 <RotateCcw className="h-4 w-4 mr-2" />

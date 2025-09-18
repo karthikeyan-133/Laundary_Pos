@@ -59,9 +59,18 @@ export const returnsApi = {
       throw new Error(`Failed to process return: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   },
-  getAll: () => {
-    console.log('Fetching all returns');
-    return apiRequest<Return[]>('/returns');
+  getAll: (fromDate?: string, toDate?: string) => {
+    console.log('Fetching all returns with date filter:', { fromDate, toDate });
+    
+    // Build query parameters
+    const queryParams = new URLSearchParams();
+    if (fromDate) queryParams.append('from_date', fromDate);
+    if (toDate) queryParams.append('to_date', toDate);
+    
+    const url = queryParams.toString() ? `/returns?${queryParams.toString()}` : '/returns';
+    console.log('Fetching returns from URL:', url);
+    
+    return apiRequest<Return[]>(url);
   },
   clearAll: () => {
     console.log('Clearing all returns');

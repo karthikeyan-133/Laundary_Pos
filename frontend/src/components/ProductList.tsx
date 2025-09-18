@@ -25,9 +25,10 @@ interface ProductListProps {
   products: Product[];
   onAddToCart: (product: Product) => void;
   onSearch: (query: string) => Product[];
+  onAddProduct?: () => void; // Add this new prop
 }
 
-export function ProductList({ products, onAddToCart, onSearch }: ProductListProps) {
+export function ProductList({ products, onAddToCart, onSearch, onAddProduct }: ProductListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isScanning, setIsScanning] = useState(false);
@@ -119,53 +120,39 @@ export function ProductList({ products, onAddToCart, onSearch }: ProductListProp
           </Button>
         </div>
 
+        {/* Category Filter Dropdown and Add Product Button */}
+        <div className="flex gap-2 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Category:</span>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="border border-border bg-card rounded-md px-3 py-2 text-sm focus:ring-primary focus:border-primary"
+            >
+              {categories.map(category => (
+                <option key={category} value={category}>
+                  {category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button 
+            variant="default" 
+            size="sm"
+            className="bg-primary hover:bg-primary-hover text-primary-foreground"
+            onClick={onAddProduct}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add Product
+          </Button>
+        </div>
+
         {/* Barcode Scanner (only shown in development) */}
         {process.env.NODE_ENV === 'development' && isScanning && (
           <div className="relative">
             <BarcodeScanner onScan={handleBarcodeScan} />
           </div>
         )}
-        
-        {/* Development tools (only shown in development) */}
-        {process.env.NODE_ENV === 'development' && !isScanning && (
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              size="sm" 
-              variant="secondary"
-              onClick={() => handleBarcodeScan('BEV001')}
-            >
-              Scan Coffee
-            </Button>
-            <Button 
-              size="sm" 
-              variant="secondary"
-              onClick={() => handleBarcodeScan('BAK001')}
-            >
-              Scan Croissant
-            </Button>
-            <Button 
-              size="sm" 
-              variant="secondary"
-              onClick={() => handleBarcodeScan('FOD001')}
-            >
-              Scan Sandwich
-            </Button>
-          </div>
-        )}
-        
-        {/* Categories */}
-        <div className="flex gap-2 flex-wrap">
-          {categories.map(category => (
-            <Badge
-              key={category}
-              variant={selectedCategory === category ? "default" : "secondary"}
-              className="cursor-pointer hover:bg-primary-hover transition-colors capitalize"
-              onClick={() => setSelectedCategory(category)}
-            >
-              {category}
-            </Badge>
-          ))}
-        </div>
       </div>
 
       {/* Products Grid */}
@@ -178,55 +165,40 @@ export function ProductList({ products, onAddToCart, onSearch }: ProductListProp
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
-          {finalProducts.map((product) => (
-            <Card 
-              key={product.id}
-              className="group hover:shadow-medium transition-all duration-200 cursor-pointer bg-card border-border"
-              onClick={() => onAddToCart(product)}
-            >
-              <CardContent className="p-4">
+        <div className="px-4">
+          <div className="grid grid-cols-5 gap-4 max-h-[70vh] overflow-y-auto">
+            {finalProducts.slice(0, 15).map((product) => (
+              <Card 
+                key={product.id}
+                className="group hover:shadow-medium transition-all duration-200 cursor-pointer bg-card border-border p-4 min-w-[140px] min-h-[120px]"
+                onClick={() => onAddToCart(product)}
+              >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors text-base truncate">
                         {product.name}
                       </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {product.description}
+                      <p className="text-xs text-muted-foreground mt-1 truncate">
+                        {product.description || product.sku}
                       </p>
                     </div>
-                    <Badge variant="secondary" className="ml-2">
-                      {product.category}
-                    </Badge>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <div className="text-2xl font-bold text-primary">
+                      <div className="text-lg font-bold text-primary">
                         AED {product.price.toFixed(2)}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        SKU: {product.sku} • Barcode: {product.barcode} • Stock: {product.stock}
+                        Stock: {product.stock}
                       </div>
                     </div>
-
-                    <Button 
-                      size="sm"
-                      className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-soft"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddToCart(product);
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>

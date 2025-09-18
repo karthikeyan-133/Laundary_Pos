@@ -951,10 +951,10 @@ export function usePOSStore() {
     }
   };
 
-  // Add function to fetch returns from backend
-  const fetchReturns = async () => {
+  // Add function to fetch returns from backend with date filtering
+  const fetchReturns = async (fromDate?: string, toDate?: string) => {
     try {
-      const fetchedReturns = await returnsApi.getAll();
+      const fetchedReturns = await returnsApi.getAll(fromDate, toDate);
       setReturns(fetchedReturns);
       return fetchedReturns;
     } catch (err) {

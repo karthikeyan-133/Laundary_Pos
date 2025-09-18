@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Printer, Eye } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Printer, Eye, Filter } from 'lucide-react';
 import { Order } from '@/types/pos';
 
 interface ReturnRecord {
@@ -36,6 +38,17 @@ interface ReturnRecordsProps {
 }
 
 export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: ReturnRecordsProps) {
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+
+  // Set today's date as default
+  React.useEffect(() => {
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    setFromDate(todayString);
+    setToDate(todayString);
+  }, []);
+
   // Format date and time
   const formatDateTime = (dateString: string) => {
     try {
@@ -105,15 +118,94 @@ export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: Return
     };
   });
 
+  // Apply date filtering to return records
+  const filteredReturns = (() => {
+    if (fromDate || toDate) {
+      return formattedReturns.filter(record => {
+        try {
+          const recordDate = new Date(`${record.date.split('-')[2]}-${record.date.split('-')[1]}-${record.date.split('-')[0]}`);
+          const from = fromDate ? new Date(fromDate) : null;
+          const to = toDate ? new Date(toDate) : null;
+          
+          // Set time to start of day for fromDate comparison
+          if (from) {
+            from.setHours(0, 0, 0, 0);
+          }
+          
+          // Set time to end of day for toDate comparison
+          if (to) {
+            to.setHours(23, 59, 59, 999);
+          }
+          
+          const result = (
+            (!from || recordDate >= from) &&
+            (!to || recordDate <= to)
+          );
+          
+          return result;
+        } catch (err) {
+          console.error('Error filtering return record by date:', record, err);
+          return false;
+        }
+      });
+    }
+    
+    return formattedReturns;
+  })();
+
   return (
     <Card className="bg-card border-border">
       <CardHeader>
-        <CardTitle className="text-card-foreground">
-          Return Records
+        <CardTitle className="text-card-foreground flex items-center justify-between">
+          <span>Return Records</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="from-date-filter" className="text-sm">From:</Label>
+              <Input
+                id="from-date-filter"
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-32"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="to-date-filter" className="text-sm">To:</Label>
+              <Input
+                id="to-date-filter"
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-32"
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                const today = new Date();
+                const todayString = today.toISOString().split('T')[0];
+                setFromDate(todayString);
+                setToDate(todayString);
+              }}
+            >
+              Today
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setFromDate('');
+                setToDate('');
+              }}
+            >
+              Clear
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {formattedReturns.length === 0 ? (
+        {filteredReturns.length === 0 ? (
           <p className="text-muted-foreground text-center py-8">No return records found</p>
         ) : (
           <div className="overflow-x-auto">
@@ -132,7 +224,7 @@ export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: Return
                 </tr>
               </thead>
               <tbody>
-                {formattedReturns.map((record, index) => (
+                {filteredReturns.map((record, index) => (
                   <tr key={record.id} className="border-b hover:bg-muted/50">
                     <td className="py-2 px-2">{record.date}</td>
                     <td className="py-2 px-2">{record.time}</td>

@@ -27,8 +27,11 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
   const [activeReport, setActiveReport] = useState<
     'bill' | 'item' | 'daily' | 'delivery'
   >('bill');
-  const [fromDate, setFromDate] = useState<string>('');
-  const [toDate, setToDate] = useState<string>('');
+  
+  // Set today's date as default
+  const today = new Date().toISOString().split('T')[0];
+  const [fromDate, setFromDate] = useState<string>(today);
+  const [toDate, setToDate] = useState<string>(today);
   const [showReturnOptions, setShowReturnOptions] = useState<boolean>(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [returnType, setReturnType] = useState<'complete' | 'partial' | null>(null);
@@ -54,11 +57,10 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
       return 'Invalid Date';
     }
     
-    // Adjust for Dubai time (UTC+4)
-    const dubaiTime = new Date(dateObj.getTime() + (4 * 60 * 60 * 1000));
+    // For display purposes, we want to show the date in local time
+    // But for filtering, we need to be consistent with how dates are stored
     
-    return dubaiTime.toLocaleString('en-US', { 
-      timeZone: 'Asia/Dubai',
+    return dateObj.toLocaleString('en-US', { 
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -82,6 +84,20 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
       return nonReturnedOrders;
     }
     
+    // Parse filter dates
+    const from = fromDate ? new Date(fromDate) : null;
+    const to = toDate ? new Date(toDate) : null;
+    
+    // Set time boundaries
+    if (from) {
+      from.setHours(0, 0, 0, 0); // Start of from date
+    }
+    if (to) {
+      to.setHours(23, 59, 59, 999); // End of to date
+    }
+    
+    console.log('Parsed filter dates - From:', from, 'To:', to);
+    
     const filtered = nonReturnedOrders.filter(order => {
       try {
         // Convert order createdAt to Date object if it's not already
@@ -103,22 +119,16 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
         
         console.log('Order date for', order.id, ':', orderDate);
         
-        // Parse filter dates
-        const from = fromDate ? new Date(fromDate) : null;
-        const to = toDate ? new Date(toDate) : null;
-        
-        console.log('Filter dates - From:', from, 'To:', to);
-        
-        // Set time to end of day for toDate comparison
-        if (to) {
-          to.setHours(23, 59, 59, 999);
-        }
+        // For comparison, we'll use the same date normalization
+        const orderTime = orderDate.getTime();
+        const fromTime = from ? from.getTime() : null;
+        const toTime = to ? to.getTime() : null;
         
         // Check if order date is within the filter range
-        const isAfterFrom = !from || orderDate >= from;
-        const isBeforeTo = !to || orderDate <= to;
+        const isAfterFrom = !fromTime || orderTime >= fromTime;
+        const isBeforeTo = !toTime || orderTime <= toTime;
         
-        console.log(`Order ${order.id} - Date: ${orderDate}, From: ${from}, To: ${to}, AfterFrom: ${isAfterFrom}, BeforeTo: ${isBeforeTo}`);
+        console.log(`Order ${order.id} - OrderTime: ${orderTime}, FromTime: ${fromTime}, ToTime: ${toTime}, AfterFrom: ${isAfterFrom}, BeforeTo: ${isBeforeTo}`);
         
         return isAfterFrom && isBeforeTo;
       } catch (error) {
@@ -550,11 +560,19 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
         let orderDate = '';
         try {
           if (order.createdAt instanceof Date) {
-            orderDate = order.createdAt.toLocaleString();
+            orderDate = order.createdAt.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            });
           } else if (typeof order.createdAt === 'string') {
             const dateObj = new Date(order.createdAt);
             if (!isNaN(dateObj.getTime())) {
-              orderDate = dateObj.toLocaleString();
+              orderDate = dateObj.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              });
             }
           }
         } catch (error) {
@@ -644,19 +662,38 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
     const dailySales: { [key: string]: { date: string, orders: number, revenue: number } } = {};
     
     filteredOrders.forEach(order => {
-      const dateStr = formatDate(order.createdAt);
-      // Skip invalid dates
-      if (dateStr !== 'Invalid Date') {
-        if (dailySales[dateStr]) {
-          dailySales[dateStr].orders += 1;
-          dailySales[dateStr].revenue += order.total;
-        } else {
-          dailySales[dateStr] = {
-            date: dateStr,
-            orders: 1,
-            revenue: order.total
-          };
-        }
+      // Convert order date to a normalized date string for grouping
+      let orderDate: Date;
+      if (order.createdAt instanceof Date) {
+        orderDate = order.createdAt;
+      } else if (typeof order.createdAt === 'string') {
+        orderDate = new Date(order.createdAt);
+      } else {
+        return; // Skip invalid dates
+      }
+      
+      // Check if orderDate is valid
+      if (isNaN(orderDate.getTime())) {
+        return; // Skip invalid dates
+      }
+      
+      // Normalize to date only (without time) for grouping
+      const dateKey = orderDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const displayDate = orderDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      
+      if (dailySales[dateKey]) {
+        dailySales[dateKey].orders += 1;
+        dailySales[dateKey].revenue += order.total;
+      } else {
+        dailySales[dateKey] = {
+          date: displayDate,
+          orders: 1,
+          revenue: order.total
+        };
       }
     });
 
@@ -818,7 +855,16 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
                 onChange={(e) => setToDate(e.target.value)}
               />
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setFromDate(today);
+                  setToDate(today);
+                }}
+              >
+                Reset to Today
+              </Button>
               <Button 
                 variant="outline" 
                 onClick={() => {
