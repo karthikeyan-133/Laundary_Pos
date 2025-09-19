@@ -1,8 +1,9 @@
-// Test file for Vercel deployment
-module.exports = (req, res) => {
-  res.json({ 
-    message: 'Tally POS Backend API is running on Vercel',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-};
+// Simple test file to verify server.js can be imported without errors
+try {
+  const app = require('./server.js');
+  console.log('Server.js imported successfully');
+  process.exit(0);
+} catch (error) {
+  console.error('Error importing server.js:', error.message);
+  process.exit(1);
+}

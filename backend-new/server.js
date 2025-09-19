@@ -22,8 +22,10 @@ console.log('Returns router loaded:', !!returnsRouter);
 
 const app = express();
 
-// Use Vercel's PORT or default to 3003 (to avoid conflicts)
+// Use Vercel's PORT or default to 3003 for local development
+// Vercel dynamically assigns a PORT through process.env.PORT
 const PORT = process.env.PORT || 3003;
+console.log('Server configured to run on port:', PORT);
 
 // Middleware
 app.use(cors({
