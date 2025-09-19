@@ -6,7 +6,7 @@ const getApiBaseUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Fallback to previous logic
+  // For Vercel deployments, API is at the same domain
   if (typeof window !== 'undefined') {
     // In browser environment
     if (window.location.hostname.includes('vercel.app')) {
