@@ -60,23 +60,23 @@ export class BarcodeSimulator {
    * @param productId The ID of the product to simulate (1-10)
    */
   simulateProductScan(productId: string): void {
-    // For sample products, we'll use their SKU as the barcode
-    const skus: Record<string, string> = {
-      '1': 'BEV001',
-      '2': 'BAK001',
-      '3': 'FOD001',
-      '4': 'BEV002',
-      '5': 'BAK002',
-      '6': 'FOD002',
-      '7': 'BEV003',
-      '8': 'BAK003',
-      '9': 'FOD003',
-      '10': 'BEV004'
+    // For sample products, we'll use their barcode
+    const barcodes: Record<string, string> = {
+      '1': 'CL001',
+      '2': 'CL002',
+      '3': 'CL003',
+      '4': 'CL004',
+      '5': 'CL005',
+      '6': 'HH001',
+      '7': 'HH002',
+      '8': 'HH003',
+      '9': 'HH004',
+      '10': 'CL006'
     };
     
-    const sku = skus[productId];
-    if (sku) {
-      this.simulateScan(sku);
+    const barcode = barcodes[productId];
+    if (barcode) {
+      this.simulateScan(barcode);
     } else {
       console.warn(`Product with ID ${productId} not found`);
     }

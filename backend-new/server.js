@@ -12,8 +12,8 @@ if (!isVercel) {
   dotenv.config({ path: envPath });
 }
 
-// Import Supabase client
-const supabase = require('./supabaseClient');
+// Import MySQL database interface instead of Supabase
+const db = require('./mysqlDb');
 
 // Import returns router
 const returnsRouter = require('./returns');
@@ -61,7 +61,7 @@ console.log('Returns router mounted at /api/returns');
 // Routes
 app.get('/', (req, res) => {
   res.json({ 
-    message: 'Tally POS API with Supabase',
+    message: 'Tally POS API with MySQL',
     timestamp: new Date().toISOString(),
     status: 'healthy'
   });
@@ -69,26 +69,22 @@ app.get('/', (req, res) => {
 
 app.get('/health', async (req, res) => {
   try {
-    // Test Supabase connection
-    const { data, error } = await supabase
-      .from('settings')
-      .select('id')
-      .limit(1);
+    // Test MySQL connection
+    const result = await db.query('SELECT 1 as connected');
     
-    if (error) {
+    if (result.length > 0) {
+      res.json({ 
+        status: 'healthy', 
+        message: 'API is running and database is connected',
+        timestamp: new Date().toISOString(),
+        database: 'connected'
+      });
+    } else {
       return res.status(503).json({ 
         status: 'unhealthy', 
-        message: 'Database connection failed',
-        error: error.message 
+        message: 'Database connection failed'
       });
     }
-    
-    res.json({ 
-      status: 'healthy', 
-      message: 'API is running and database is connected',
-      timestamp: new Date().toISOString(),
-      database: 'connected'
-    });
   } catch (err) {
     res.status(503).json({ 
       status: 'unhealthy', 
@@ -101,16 +97,17 @@ app.get('/health', async (req, res) => {
 // Products routes
 app.get('/api/products', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*');
+    const data = await db.query('SELECT * FROM products');
     
-    if (error) {
-      console.error('Error fetching products:', error);
-      return res.status(500).json({ error: 'Failed to fetch products' });
-    }
+    // Transform column names to match frontend expectations
+    const transformedData = data.map(product => ({
+      ...product,
+      ironRate: parseFloat(product.ironRate) || 0,
+      washAndIronRate: parseFloat(product.washAndIronRate) || 0,
+      dryCleanRate: parseFloat(product.dryCleanRate) || 0
+    }));
     
-    res.json(data);
+    res.json(transformedData);
   } catch (err) {
     console.error('Error fetching products:', err);
     return res.status(500).json({ error: 'Failed to fetch products' });
@@ -121,22 +118,21 @@ app.get('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   
   try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const data = await db.query('SELECT * FROM products WHERE id = ?', [id]);
     
-    if (error) {
-      console.error('Error fetching product:', error);
-      return res.status(500).json({ error: 'Failed to fetch product' });
-    }
-    
-    if (!data) {
+    if (data.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    res.json(data);
+    // Transform column names to match frontend expectations
+    const transformedData = {
+      ...data[0],
+      ironRate: parseFloat(data[0].ironRate) || 0,
+      washAndIronRate: parseFloat(data[0].washAndIronRate) || 0,
+      dryCleanRate: parseFloat(data[0].dryCleanRate) || 0
+    };
+    
+    res.json(transformedData);
   } catch (err) {
     console.error('Error fetching product:', err);
     return res.status(500).json({ error: 'Failed to fetch product' });
@@ -144,56 +140,126 @@ app.get('/api/products/:id', async (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-  // Generate a unique ID if not provided
-  const id = req.body.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  const { name, price, category, sku, barcode, stock, description } = req.body;
-  
   try {
-    const { data, error } = await supabase
-      .from('products')
-      .insert([
-        { id, name, price, category, sku, barcode, stock, description }
-      ])
-      .select()
-      .single();
+    // Generate a unique ID if not provided
+    const id = req.body.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const { name, ironRate, washAndIronRate, dryCleanRate, category, barcode, description } = req.body;
     
-    if (error) {
-      console.error('Error creating product:', error);
-      return res.status(500).json({ error: 'Failed to create product' });
+    // Log incoming request for debugging
+    console.log('Product creation request received:', { name, category, barcode });
+    
+    // Validate required fields
+    if (!name || !category || !barcode) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        details: 'Name, category, and barcode are required',
+        received: { name: !!name, category: !!category, barcode: !!barcode }
+      });
     }
     
-    res.status(201).json(data);
+    // Ensure all rate fields are provided and are valid numbers
+    const ironRateNum = parseFloat(ironRate);
+    const washAndIronRateNum = parseFloat(washAndIronRate);
+    const dryCleanRateNum = parseFloat(dryCleanRate);
+    
+    // Validate that rates are valid numbers
+    if (isNaN(ironRateNum) || isNaN(washAndIronRateNum) || isNaN(dryCleanRateNum)) {
+      return res.status(400).json({ 
+        error: 'Invalid rate values', 
+        details: 'All rate values must be valid numbers',
+        received: { ironRate, washAndIronRate, dryCleanRate }
+      });
+    }
+    
+    // Prepare product data
+    const productData = [
+      id,
+      name,
+      ironRateNum,
+      washAndIronRateNum,
+      dryCleanRateNum,
+      category,
+      barcode,
+      description || null
+    ];
+    
+    console.log('Attempting to insert product:', productData);
+    
+    // Insert the product
+    const result = await db.query(
+      'INSERT INTO products (id, name, ironRate, washAndIronRate, dryCleanRate, category, barcode, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      productData
+    );
+    
+    console.log('Product created successfully:', result);
+    
+    // Transform response to match frontend expectations
+    const responseData = {
+      id,
+      name,
+      ironRate: ironRateNum,
+      washAndIronRate: washAndIronRateNum,
+      dryCleanRate: dryCleanRateNum,
+      category,
+      barcode,
+      description: description || undefined,
+      created_at: new Date().toISOString().slice(0, 19).replace('T', ' '), // Format for MySQL DATETIME
+      updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ')  // Format for MySQL DATETIME
+    };
+    
+    // Remove undefined fields
+    Object.keys(responseData).forEach(key => {
+      if (responseData[key] === undefined) {
+        delete responseData[key];
+      }
+    });
+    
+    res.status(201).json(responseData);
   } catch (err) {
-    console.error('Error creating product:', err);
-    return res.status(500).json({ error: 'Failed to create product' });
+    console.error('Unexpected error in product creation:', err);
+    return res.status(500).json({ 
+      error: 'Failed to create product',
+      details: err.message
+    });
   }
 });
 
 app.put('/api/products/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, price, category, sku, barcode, stock, description } = req.body;
+  const { name, ironRate, washAndIronRate, dryCleanRate, category, barcode, description } = req.body;
+  
+  // Ensure all rate fields are provided and are numbers
+  const productData = {
+    name,
+    ironRate: parseFloat(ironRate) || 0,
+    washAndIronRate: parseFloat(washAndIronRate) || 0,
+    dryCleanRate: parseFloat(dryCleanRate) || 0,
+    category,
+    barcode,
+    description
+  };
   
   try {
-    const { data, error } = await supabase
-      .from('products')
-      .update({ name, price, category, sku, barcode, stock, description })
-      .eq('id', id)
-      .select()
-      .single();
+    const result = await db.query(
+      'UPDATE products SET name = ?, ironRate = ?, washAndIronRate = ?, dryCleanRate = ?, category = ?, barcode = ?, description = ? WHERE id = ?',
+      [productData.name, productData.ironRate, productData.washAndIronRate, productData.dryCleanRate, productData.category, productData.barcode, productData.description, id]
+    );
     
-    if (error) {
-      console.error('Error updating product:', error);
-      return res.status(500).json({ error: 'Failed to update product' });
-    }
-    
-    if (!data) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    res.json(data);
+    // Fetch updated product
+    const data = await db.query('SELECT * FROM products WHERE id = ?', [id]);
+    
+    if (data.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    res.json(data[0]);
   } catch (err) {
     console.error('Error updating product:', err);
-    return res.status(500).json({ error: 'Failed to update product' });
+    return res.status(500).json({ error: 'Failed to update product', details: err.message });
   }
 });
 
@@ -201,39 +267,51 @@ app.delete('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   
   try {
-    const { data, error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id);
+    // First, check if the product exists
+    const existingProduct = await db.query('SELECT id FROM products WHERE id = ?', [id]);
     
-    if (error) {
-      console.error('Error deleting product:', error);
-      return res.status(500).json({ error: 'Failed to delete product' });
+    if (existingProduct.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
     }
     
-    if (data.length === 0) {
+    // Check if product is referenced in order_items
+    const orderItems = await db.query('SELECT id FROM order_items WHERE product_id = ? LIMIT 1', [id]);
+    
+    if (orderItems.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete product', 
+        details: 'This product is referenced in existing orders and cannot be deleted.' 
+      });
+    }
+    
+    // Check if product is referenced in return_items
+    const returnItems = await db.query('SELECT id FROM return_items WHERE product_id = ? LIMIT 1', [id]);
+    
+    if (returnItems.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete product', 
+        details: 'This product is referenced in existing returns and cannot be deleted.' 
+      });
+    }
+    
+    // If no references, proceed with deletion
+    const result = await db.query('DELETE FROM products WHERE id = ?', [id]);
+    
+    if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
     
     res.status(204).send();
   } catch (err) {
     console.error('Error deleting product:', err);
-    return res.status(500).json({ error: 'Failed to delete product' });
+    return res.status(500).json({ error: 'Failed to delete product', details: err.message });
   }
 });
 
 // Customers routes
 app.get('/api/customers', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*');
-    
-    if (error) {
-      console.error('Error fetching customers:', error);
-      return res.status(500).json({ error: 'Failed to fetch customers' });
-    }
-    
+    const data = await db.query('SELECT * FROM customers');
     res.json(data);
   } catch (err) {
     console.error('Error fetching customers:', err);
@@ -245,22 +323,13 @@ app.get('/api/customers/:id', async (req, res) => {
   const { id } = req.params;
   
   try {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const data = await db.query('SELECT * FROM customers WHERE id = ?', [id]);
     
-    if (error) {
-      console.error('Error fetching customer:', error);
-      return res.status(500).json({ error: 'Failed to fetch customer' });
-    }
-    
-    if (!data) {
+    if (data.length === 0) {
       return res.status(404).json({ error: 'Customer not found' });
     }
     
-    res.json(data);
+    res.json(data[0]);
   } catch (err) {
     console.error('Error fetching customer:', err);
     return res.status(500).json({ error: 'Failed to fetch customer' });
@@ -273,20 +342,24 @@ app.post('/api/customers', async (req, res) => {
   const { name, code, contact_name, phone, email, place, emirate } = req.body;
   
   try {
-    const { data, error } = await supabase
-      .from('customers')
-      .insert([
-        { id, name, code, contact_name: contact_name, phone, email, place, emirate }
-      ])
-      .select()
-      .single();
+    const result = await db.query(
+      'INSERT INTO customers (id, name, code, contact_name, phone, email, place, emirate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        id, 
+        name, 
+        code !== undefined ? code : null,
+        contact_name !== undefined ? contact_name : null,
+        phone !== undefined ? phone : null,
+        email !== undefined ? email : null,
+        place !== undefined ? place : null,
+        emirate !== undefined ? emirate : null
+      ]
+    );
     
-    if (error) {
-      console.error('Error creating customer:', error);
-      return res.status(500).json({ error: 'Failed to create customer' });
-    }
+    // Fetch created customer
+    const data = await db.query('SELECT * FROM customers WHERE id = ?', [id]);
     
-    res.status(201).json(data);
+    res.status(201).json(data[0]);
   } catch (err) {
     console.error('Error creating customer:', err);
     return res.status(500).json({ error: 'Failed to create customer' });
@@ -297,41 +370,23 @@ app.post('/api/customers', async (req, res) => {
 app.get('/api/orders', async (req, res) => {
   try {
     // Get orders with customer information
-    const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        customers(name, code, phone)
-      `)
-      .order('created_at', { ascending: false });
-    
-    if (ordersError) {
-      console.error('Error fetching orders:', ordersError);
-      return res.status(500).json({ error: 'Failed to fetch orders' });
-    }
+    const orders = await db.query(`
+      SELECT o.*, c.name as customer_name, c.code as customer_code, c.phone as customer_phone 
+      FROM orders o 
+      LEFT JOIN customers c ON o.customer_id = c.id 
+      ORDER BY o.created_at DESC
+    `);
     
     // For each order, get its items with product information
     const ordersWithItems = await Promise.all(orders.map(async (order) => {
-      const { data: items, error: itemsError } = await supabase
-        .from('order_items')
-        .select(`
-          *,
-          products(name, sku, price, category, stock, description, barcode)
-        `)
-        .eq('order_id', order.id);
+      const items = await db.query(`
+        SELECT oi.*, p.name as product_name, p.ironRate, p.washAndIronRate, p.dryCleanRate, p.category, p.description, p.barcode
+        FROM order_items oi
+        LEFT JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = ?
+      `, [order.id]);
       
-      if (itemsError) {
-        console.error('Error fetching order items for order', order.id, ':', itemsError);
-        return { ...order, items: [] };
-      }
-      
-      // Convert products to product to match frontend expectations
-      const itemsWithProduct = items.map(item => ({
-        ...item,
-        product: item.products // Rename products to product
-      })).map(({ products, ...rest }) => rest); // Remove the products field
-      
-      return { ...order, items: itemsWithProduct };
+      return { ...order, items };
     }));
     
     res.json(ordersWithItems);
@@ -346,37 +401,26 @@ app.get('/api/orders/:id', async (req, res) => {
   
   try {
     // Get order with customer information
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        customers(name, code, phone)
-      `)
-      .eq('id', id)
-      .single();
+    const orders = await db.query(`
+      SELECT o.*, c.name as customer_name, c.code as customer_code, c.phone as customer_phone 
+      FROM orders o 
+      LEFT JOIN customers c ON o.customer_id = c.id 
+      WHERE o.id = ?
+    `, [id]);
     
-    if (orderError) {
-      console.error('Error fetching order:', orderError);
-      return res.status(500).json({ error: 'Failed to fetch order' });
-    }
-    
-    if (!order) {
+    if (orders.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
     
-    // Get order items with product information
-    const { data: items, error: itemsError } = await supabase
-      .from('order_items')
-      .select(`
-        *,
-        products(name, sku, price)
-      `)
-      .eq('order_id', id);
+    const order = orders[0];
     
-    if (itemsError) {
-      console.error('Error fetching order items:', itemsError);
-      return res.status(500).json({ error: 'Failed to fetch order items' });
-    }
+    // Get order items with product information
+    const items = await db.query(`
+      SELECT oi.*, p.name as product_name, p.ironRate, p.washAndIronRate, p.dryCleanRate
+      FROM order_items oi
+      LEFT JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = ?
+    `, [id]);
     
     const orderWithItems = {
       ...order,
@@ -396,61 +440,48 @@ app.post('/api/orders', async (req, res) => {
   const { customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status, items } = req.body;
   
   try {
-    // Check if Supabase is properly configured
-    if (!supabase || !supabase.from) {
-      console.error('Supabase not properly configured');
-      return res.status(500).json({ error: 'Database not configured properly' });
-    }
-    
-    // Insert order
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .insert([
-        { 
-          id, 
-          customer_id, 
-          subtotal, 
-          discount, 
-          tax, 
-          total, 
-          payment_method, 
-          cash_amount, 
-          card_amount, 
-          status, 
-          delivery_status, 
-          payment_status 
-        }
-      ])
-      .select()
-      .single();
-    
-    if (orderError) {
-      console.error('Error creating order:', orderError);
-      return res.status(500).json({ error: 'Failed to create order: ' + orderError.message });
-    }
+    // Insert order, ensuring undefined values are converted to null for the database
+    const result = await db.query(
+      'INSERT INTO orders (id, customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        id, 
+        customer_id, 
+        subtotal, 
+        discount, 
+        tax, 
+        total, 
+        payment_method, 
+        cash_amount !== undefined ? cash_amount : null, 
+        card_amount !== undefined ? card_amount : null, 
+        status, 
+        delivery_status !== undefined ? delivery_status : null, 
+        payment_status !== undefined ? payment_status : null
+      ]
+    );
     
     // Insert order items
     if (items && items.length > 0) {
-      const orderItems = items.map(item => ({
-        id: item.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        order_id: id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        discount: item.discount,
-        subtotal: item.subtotal
-      }));
-      
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-      
-      if (itemsError) {
-        console.error('Error creating order items:', itemsError);
-        return res.status(500).json({ error: 'Failed to create order items: ' + itemsError.message });
+      for (const item of items) {
+        const itemId = item.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        await db.query(
+          'INSERT INTO order_items (id, order_id, product_id, quantity, discount, subtotal, service) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            itemId, 
+            id, 
+            item.product_id, 
+            item.quantity, 
+            item.discount, 
+            item.subtotal, 
+            item.service
+          ]
+        );
       }
     }
     
-    res.status(201).json(orderData);
+    // Fetch created order
+    const orders = await db.query('SELECT * FROM orders WHERE id = ?', [id]);
+    
+    res.status(201).json(orders[0]);
   } catch (err) {
     console.error('Error creating order:', err);
     return res.status(500).json({ error: 'Failed to create order: ' + err.message });
@@ -463,63 +494,77 @@ app.put('/api/orders/:id', async (req, res) => {
   const { customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status, items } = req.body;
   
   try {
-    // Check if Supabase is properly configured
-    if (!supabase || !supabase.from) {
-      console.error('Supabase not properly configured');
-      return res.status(500).json({ error: 'Database not configured properly' });
-    }
-    
     // Update order
-    const updateData = {};
-    if (customer_id !== undefined) updateData.customer_id = customer_id;
-    if (subtotal !== undefined) updateData.subtotal = subtotal;
-    if (discount !== undefined) updateData.discount = discount;
-    if (tax !== undefined) updateData.tax = tax;
-    if (total !== undefined) updateData.total = total;
-    if (payment_method !== undefined) updateData.payment_method = payment_method;
-    if (cash_amount !== undefined) updateData.cash_amount = cash_amount;
-    if (card_amount !== undefined) updateData.card_amount = card_amount;
-    if (status !== undefined) updateData.status = status;
-    if (delivery_status !== undefined) updateData.delivery_status = delivery_status;
-    if (payment_status !== undefined) updateData.payment_status = payment_status;
+    const updateData = [];
+    const updateFields = [];
+    
+    if (customer_id !== undefined) {
+      updateFields.push('customer_id = ?');
+      updateData.push(customer_id);
+    }
+    if (subtotal !== undefined) {
+      updateFields.push('subtotal = ?');
+      updateData.push(subtotal);
+    }
+    if (discount !== undefined) {
+      updateFields.push('discount = ?');
+      updateData.push(discount);
+    }
+    if (tax !== undefined) {
+      updateFields.push('tax = ?');
+      updateData.push(tax);
+    }
+    if (total !== undefined) {
+      updateFields.push('total = ?');
+      updateData.push(total);
+    }
+    if (payment_method !== undefined) {
+      updateFields.push('payment_method = ?');
+      updateData.push(payment_method);
+    }
+    if (cash_amount !== undefined) {
+      updateFields.push('cash_amount = ?');
+      updateData.push(cash_amount !== undefined ? cash_amount : null);
+    }
+    if (card_amount !== undefined) {
+      updateFields.push('card_amount = ?');
+      updateData.push(card_amount !== undefined ? card_amount : null);
+    }
+    if (status !== undefined) {
+      updateFields.push('status = ?');
+      updateData.push(status);
+    }
+    if (delivery_status !== undefined) {
+      updateFields.push('delivery_status = ?');
+      updateData.push(delivery_status !== undefined ? delivery_status : null);
+    }
+    if (payment_status !== undefined) {
+      updateFields.push('payment_status = ?');
+      updateData.push(payment_status !== undefined ? payment_status : null);
+    }
     
     // Only update if there's data to update
-    if (Object.keys(updateData).length > 0) {
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .update(updateData)
-        .eq('id', id)
-        .select();
-      
-      if (orderError) {
-        console.error('Error updating order:', orderError);
-        return res.status(500).json({ error: 'Failed to update order: ' + orderError.message });
-      }
+    if (updateFields.length > 0) {
+      updateData.push(id); // Add id for WHERE clause
+      const result = await db.query(
+        `UPDATE orders SET ${updateFields.join(', ')} WHERE id = ?`,
+        updateData
+      );
       
       // Check if any rows were updated
-      if (!orderData || orderData.length === 0) {
+      if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Order not found' });
       }
-      
-      res.json(orderData[0]);
-    } else {
-      // If no update data provided, just return the order
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', id);
-      
-      if (orderError) {
-        console.error('Error fetching order:', orderError);
-        return res.status(500).json({ error: 'Failed to fetch order: ' + orderError.message });
-      }
-      
-      if (!orderData || orderData.length === 0) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
-      
-      res.json(orderData[0]);
     }
+    
+    // Fetch updated order
+    const orders = await db.query('SELECT * FROM orders WHERE id = ?', [id]);
+    
+    if (orders.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    res.json(orders[0]);
   } catch (err) {
     console.error('Error updating order:', err);
     return res.status(500).json({ error: 'Failed to update order: ' + err.message });
@@ -529,15 +574,7 @@ app.put('/api/orders/:id', async (req, res) => {
 // Settings routes
 app.get('/api/settings', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('*')
-      .limit(1);
-    
-    if (error) {
-      console.error('Error fetching settings:', error);
-      return res.status(500).json({ error: 'Failed to fetch settings' });
-    }
+    const data = await db.query('SELECT * FROM settings LIMIT 1');
     
     if (data.length === 0) {
       return res.status(404).json({ error: 'Settings not found' });
@@ -555,46 +592,39 @@ app.put('/api/settings', async (req, res) => {
   
   try {
     // Try to update existing settings
-    const { data: updateData, error: updateError } = await supabase
-      .from('settings')
-      .update({ 
-        tax_rate, 
-        currency, 
-        business_name, 
-        business_address, 
-        business_phone, 
-        barcode_scanner_enabled 
-      })
-      .eq('id', 1)
-      .select()
-      .single();
+    const result = await db.query(
+      'UPDATE settings SET tax_rate = ?, currency = ?, business_name = ?, business_address = ?, business_phone = ?, barcode_scanner_enabled = ? WHERE id = 1',
+      [
+        tax_rate !== undefined ? tax_rate : null,
+        currency !== undefined ? currency : null,
+        business_name !== undefined ? business_name : null,
+        business_address !== undefined ? business_address : null,
+        business_phone !== undefined ? business_phone : null,
+        barcode_scanner_enabled !== undefined ? barcode_scanner_enabled : null
+      ]
+    );
     
-    if (updateError) {
+    if (result.affectedRows === 0) {
       // If no settings exist, insert new ones
-      const { data: insertData, error: insertError } = await supabase
-        .from('settings')
-        .insert([
-          { 
-            id: 1,
-            tax_rate, 
-            currency, 
-            business_name, 
-            business_address, 
-            business_phone, 
-            barcode_scanner_enabled 
-          }
-        ])
-        .select()
-        .single();
+      const insertResult = await db.query(
+        'INSERT INTO settings (id, tax_rate, currency, business_name, business_address, business_phone, barcode_scanner_enabled) VALUES (1, ?, ?, ?, ?, ?, ?)',
+        [
+          tax_rate !== undefined ? tax_rate : null,
+          currency !== undefined ? currency : null,
+          business_name !== undefined ? business_name : null,
+          business_address !== undefined ? business_address : null,
+          business_phone !== undefined ? business_phone : null,
+          barcode_scanner_enabled !== undefined ? barcode_scanner_enabled : null
+        ]
+      );
       
-      if (insertError) {
-        console.error('Error creating settings:', insertError);
-        return res.status(500).json({ error: 'Failed to create settings' });
-      }
-      
-      res.json(insertData);
+      // Fetch created settings
+      const data = await db.query('SELECT * FROM settings WHERE id = 1');
+      res.json(data[0]);
     } else {
-      res.json(updateData);
+      // Fetch updated settings
+      const data = await db.query('SELECT * FROM settings WHERE id = 1');
+      res.json(data[0]);
     }
   } catch (err) {
     console.error('Error updating settings:', err);
@@ -605,9 +635,18 @@ app.put('/api/settings', async (req, res) => {
 // Vercel requires us to export the app, not start the server directly
 // Only start the server if not running on Vercel
 if (!process.env.VERCEL) {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT} with Supabase database`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT} with MySQL database`);
     console.log(`Health check: http://localhost:${PORT}/health`);
+  });
+  
+  // Handle server errors
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Please close the application using that port or use a different port.`);
+    } else {
+      console.error('Server error:', err);
+    }
   });
 }
 

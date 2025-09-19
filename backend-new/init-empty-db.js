@@ -49,11 +49,11 @@ connection.connect((err) => {
     `CREATE TABLE IF NOT EXISTS products (
       id VARCHAR(50) PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
-      price DECIMAL(10, 2) NOT NULL,
+      ironRate DECIMAL(10, 2) NOT NULL,
+      washAndIronRate DECIMAL(10, 2) NOT NULL,
+      dryCleanRate DECIMAL(10, 2) NOT NULL,
       category VARCHAR(100) NOT NULL,
-      sku VARCHAR(50) UNIQUE NOT NULL,
       barcode VARCHAR(50) UNIQUE,
-      stock INT NOT NULL DEFAULT 0,
       description TEXT
     )`,
     

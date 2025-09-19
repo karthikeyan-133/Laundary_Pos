@@ -18,16 +18,15 @@ interface ReturnRecord {
     product_id: string;
     quantity: number;
     refund_amount: number;
-    products?: {
-      name: string;
-      sku: string;
-    };
+    product_name?: string;
+    barcode?: string;
+    ironRate?: number;
+    washAndIronRate?: number;
+    dryCleanRate?: number;
   }>;
   orders?: {
     id: string;
-    customers?: {
-      name: string;
-    };
+    customer_name?: string;
   };
 }
 
@@ -95,14 +94,21 @@ export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: Return
     let itemDetails: string[] = [];
     
     items.forEach((item: any) => {
-      const product = item.products || {};
       const quantity = item.quantity || 0;
-      const refund = item.refund_amount || 0;
+      // Use refund_amount directly from the item, with proper fallback
+      const refund = item.refund_amount !== undefined && item.refund_amount !== null ? 
+        (typeof item.refund_amount === 'string' ? parseFloat(item.refund_amount) : item.refund_amount) : 0;
       
       totalQuantity += quantity;
       totalRefund += refund;
-      itemDetails.push(`${product.name || product.sku || 'Unknown Product'} (${quantity})`);
+      
+      // Get product name with fallbacks
+      const productName = item.product_name || item.barcode || 'Unknown Product';
+      itemDetails.push(`${productName} (${quantity})`);
     });
+    
+    // Calculate average price
+    const avgPrice = totalQuantity > 0 ? totalRefund / totalQuantity : 0;
     
     return {
       id: returnRecord.id,
@@ -111,7 +117,7 @@ export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: Return
       orderId: returnRecord.order_id.slice(-6),
       productName: itemDetails.join(', '),
       quantity: totalQuantity,
-      price: totalQuantity > 0 ? totalRefund / totalQuantity : 0,
+      price: avgPrice,
       subtotal: totalRefund,
       status: 'completed',
       orderIdFull: returnRecord.order_id
@@ -231,8 +237,8 @@ export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: Return
                     <td className="py-2 px-2">{record.orderId}</td>
                     <td className="py-2 px-2">{record.productName}</td>
                     <td className="py-2 px-2">{record.quantity}</td>
-                    <td className="py-2 px-2">AED {record.price.toFixed(2)}</td>
-                    <td className="py-2 px-2">AED {record.subtotal.toFixed(2)}</td>
+                    <td className="py-2 px-2">AED {Number(record.price).toFixed(2)}</td>
+                    <td className="py-2 px-2">AED {Number(record.subtotal).toFixed(2)}</td>
                     <td className="py-2 px-2">
                       <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                         {record.status}

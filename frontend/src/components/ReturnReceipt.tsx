@@ -15,6 +15,26 @@ interface ReturnReceiptProps {
   showActions?: boolean;
 }
 
+// Helper function to get service name
+const getServiceName = (service: 'iron' | 'washAndIron' | 'dryClean') => {
+  switch (service) {
+    case 'iron': return 'Iron';
+    case 'washAndIron': return 'Wash & Iron';
+    case 'dryClean': return 'Dry Clean';
+    default: return '';
+  }
+};
+
+// Helper function to get service rate
+const getServiceRate = (product: any, service: 'iron' | 'washAndIron' | 'dryClean') => {
+  switch (service) {
+    case 'iron': return product.ironRate || 0;
+    case 'washAndIron': return product.washAndIronRate || 0;
+    case 'dryClean': return product.dryCleanRate || 0;
+    default: return 0;
+  }
+};
+
 export const ReturnReceipt = forwardRef<HTMLDivElement, ReturnReceiptProps>(({
   order,
   settings,
@@ -53,7 +73,8 @@ export const ReturnReceipt = forwardRef<HTMLDivElement, ReturnReceiptProps>(({
     order.items.forEach(item => {
       const returnQuantity = returnItems[item.id] || 0;
       if (returnQuantity > 0) {
-        const itemSubtotal = returnQuantity * item.product.price * (1 - item.discount / 100);
+        const serviceRate = getServiceRate(item.product, item.service);
+        const itemSubtotal = returnQuantity * serviceRate * (1 - item.discount / 100);
         const itemTax = itemSubtotal * (settings.taxRate / 100);
         returnSubtotal += itemSubtotal;
         returnTax += itemTax;
@@ -121,11 +142,11 @@ export const ReturnReceipt = forwardRef<HTMLDivElement, ReturnReceiptProps>(({
           {/* Customer Info */}
           <div className="space-y-1">
             <h4 className="font-semibold text-card-foreground">Customer:</h4>
-            <p className="text-sm text-card-foreground">{order.customer.name}</p>
-            {order.customer.phone && (
+            <p className="text-sm text-card-foreground">{order.customer?.name || 'Walk-in Customer'}</p>
+            {order.customer?.phone && (
               <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
             )}
-            {order.customer.email && (
+            {order.customer?.email && (
               <p className="text-sm text-muted-foreground">{order.customer.email}</p>
             )}
           </div>
@@ -139,14 +160,15 @@ export const ReturnReceipt = forwardRef<HTMLDivElement, ReturnReceiptProps>(({
               .filter(item => (returnItems[item.id] || 0) > 0)
               .map((item, index) => {
                 const returnQuantity = returnItems[item.id] || 0;
-                const itemSubtotal = returnQuantity * item.product.price * (1 - item.discount / 100);
+                const serviceRate = getServiceRate(item.product, item.service);
+                const itemSubtotal = returnQuantity * serviceRate * (1 - item.discount / 100);
                 return (
                   <div key={index} className="space-y-2">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <p className="font-medium text-card-foreground">{item.product.name}</p>
+                        <p className="font-medium text-card-foreground">{item.product.name || 'Unknown Product'}</p>
                         <p className="text-sm text-muted-foreground">
-                          {settings.currency} {item.product.price.toFixed(2)} × {returnQuantity}
+                          {getServiceName(item.service)} - {settings.currency} {serviceRate.toFixed(2)} × {returnQuantity}
                           {item.discount > 0 && (
                             <span className="text-warning ml-1">(-{item.discount}%)</span>
                           )}

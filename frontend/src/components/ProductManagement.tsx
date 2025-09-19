@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Product } from '@/types/pos';
 import { useToast } from '@/hooks/use-toast';
@@ -29,91 +28,156 @@ export function ProductManagement({
   
   // Form state
   const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
+  const [ironRate, setIronRate] = useState('');
+  const [washAndIronRate, setWashAndIronRate] = useState('');
+  const [dryCleanRate, setDryCleanRate] = useState('');
   const [category, setCategory] = useState('');
-  const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState(''); // Add barcode state
-  const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const resetForm = () => {
     setName('');
-    setPrice('');
+    setIronRate('');
+    setWashAndIronRate('');
+    setDryCleanRate('');
     setCategory('');
-    setSku('');
     setBarcode(''); // Reset barcode
-    setStock('');
     setDescription('');
     setEditingProduct(null);
     setIsDialogOpen(false);
   };
 
-  const handleAddProduct = () => {
-    if (!name || !price || !category || !sku || !barcode) { // Require barcode
+  const handleAddProduct = async () => {
+    if (!name || !ironRate || !washAndIronRate || !dryCleanRate || !category || !barcode) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields (including barcode)",
+        description: "Please fill in all required fields (including all service rates and barcode)",
         variant: "destructive"
       });
       return;
     }
 
-    onAddProduct({
-      name,
-      price: parseFloat(price),
-      category,
-      sku,
-      barcode, // Add barcode
-      stock: parseInt(stock) || 0,
-      description
-    });
+    // Validate that rates are valid numbers
+    const ironRateNum = parseFloat(ironRate);
+    const washAndIronRateNum = parseFloat(washAndIronRate);
+    const dryCleanRateNum = parseFloat(dryCleanRate);
 
-    toast({
-      title: "Product Added",
-      description: `${name} has been added to the product list`
-    });
+    if (isNaN(ironRateNum) || isNaN(washAndIronRateNum) || isNaN(dryCleanRateNum)) {
+      toast({
+        title: "Validation Error",
+        description: "All rate values must be valid numbers",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    resetForm();
+    try {
+      const newProduct = {
+        name,
+        ironRate: ironRateNum,
+        washAndIronRate: washAndIronRateNum,
+        dryCleanRate: dryCleanRateNum,
+        category,
+        barcode,
+        description
+      };
+
+      console.log('Sending product data to API:', newProduct);
+      await onAddProduct(newProduct);
+
+      toast({
+        title: "Product Added",
+        description: `${name} has been added to the product list`
+      });
+
+      resetForm();
+    } catch (error: any) {
+      console.error('Error adding product:', error);
+      // Provide more detailed error information
+      const errorMessage = error.message || "Failed to add product. Please try again.";
+      const errorDetails = error.details ? `Details: ${error.details}` : '';
+      const errorHint = error.hint ? `Hint: ${error.hint}` : '';
+      
+      toast({
+        title: "Error",
+        description: `${errorMessage} ${errorDetails} ${errorHint}`,
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleEditProduct = () => {
-    if (!editingProduct || !name || !price || !category || !sku || !barcode) { // Require barcode
+  const handleEditProduct = async () => {
+    if (!editingProduct || !name || !ironRate || !washAndIronRate || !dryCleanRate || !category || !barcode) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields (including barcode)",
+        description: "Please fill in all required fields (including all service rates and barcode)",
         variant: "destructive"
       });
       return;
     }
 
-    onEditProduct({
-      ...editingProduct,
-      name,
-      price: parseFloat(price),
-      category,
-      sku,
-      barcode, // Update barcode
-      stock: parseInt(stock) || 0,
-      description
-    });
+    try {
+      const updatedProduct = {
+        ...editingProduct,
+        name,
+        ironRate: parseFloat(ironRate),
+        washAndIronRate: parseFloat(washAndIronRate),
+        dryCleanRate: parseFloat(dryCleanRate),
+        category,
+        barcode,
+        description
+      };
 
-    toast({
-      title: "Product Updated",
-      description: `${name} has been updated`
-    });
+      await onEditProduct(updatedProduct);
 
-    resetForm();
+      toast({
+        title: "Product Updated",
+        description: `${name} has been updated`
+      });
+
+      resetForm();
+    } catch (error: any) {
+      console.error('Error updating product:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update product. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRemoveProduct = async (productId: string) => {
+    try {
+      await onRemoveProduct(productId);
+      toast({
+        title: "Product Removed",
+        description: "Product has been removed successfully"
+      });
+    } catch (error: any) {
+      console.error('Error removing product:', error);
+      // Provide more specific error handling for deletion issues
+      let errorMessage = error.message || "Failed to remove product. Please try again.";
+      if (errorMessage.includes('referenced in existing')) {
+        errorMessage = 'Cannot delete this product because it is referenced in existing orders or returns. To remove this product, you would need to first delete all related orders and returns.';
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleEditClick = (product: Product) => {
     setEditingProduct(product);
     setName(product.name);
-    setPrice(product.price.toString());
+    setIronRate(product.ironRate.toString());
+    setWashAndIronRate(product.washAndIronRate.toString());
+    setDryCleanRate(product.dryCleanRate.toString());
     setCategory(product.category);
-    setSku(product.sku);
     setBarcode(product.barcode); // Load barcode
-    setStock(product.stock.toString());
     setDescription(product.description || '');
     setIsDialogOpen(true);
   };
@@ -148,12 +212,52 @@ export function ProductManagement({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="price">Price (AED) <span className="text-destructive">*</span></Label>
+                      <Label htmlFor="category">Category <span className="text-destructive">*</span></Label>
+                      <Select value={category} onValueChange={setCategory}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Clothing">Clothing</SelectItem>
+                          <SelectItem value="Household">Household</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ironRate">Iron Rate (AED) <span className="text-destructive">*</span></Label>
                       <Input
-                        id="price"
+                        id="ironRate"
                         type="number"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
+                        value={ironRate}
+                        onChange={(e) => setIronRate(e.target.value)}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="washAndIronRate">Wash & Iron Rate (AED) <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="washAndIronRate"
+                        type="number"
+                        value={washAndIronRate}
+                        onChange={(e) => setWashAndIronRate(e.target.value)}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dryCleanRate">Dry Clean Rate (AED) <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="dryCleanRate"
+                        type="number"
+                        value={dryCleanRate}
+                        onChange={(e) => setDryCleanRate(e.target.value)}
                         placeholder="0.00"
                         step="0.01"
                         min="0"
@@ -161,32 +265,7 @@ export function ProductManagement({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category <span className="text-destructive">*</span></Label>
-                      <Select value={category} onValueChange={setCategory}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Beverages">Beverages</SelectItem>
-                          <SelectItem value="Bakery">Bakery</SelectItem>
-                          <SelectItem value="Food">Food</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="sku">SKU <span className="text-destructive">*</span></Label>
-                      <Input
-                        id="sku"
-                        value={sku}
-                        onChange={(e) => setSku(e.target.value)}
-                        placeholder="Enter SKU"
-                      />
-                    </div>
-
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="barcode">Barcode <span className="text-destructive">*</span></Label>
                       <Input
@@ -194,20 +273,6 @@ export function ProductManagement({
                         value={barcode}
                         onChange={(e) => setBarcode(e.target.value)}
                         placeholder="Enter barcode"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="stock">Stock</Label>
-                      <Input
-                        id="stock"
-                        type="number"
-                        value={stock}
-                        onChange={(e) => setStock(e.target.value)}
-                        placeholder="0"
-                        min="0"
                       />
                     </div>
 
@@ -256,18 +321,29 @@ export function ProductManagement({
                       <div>
                         <h4 className="font-semibold">{product.name}</h4>
                         <p className="text-sm text-muted-foreground">
-                          {product.category} • {product.sku}
+                          {product.category}
                         </p>
                       </div>
-                      <Badge variant="secondary" className="ml-2">
-                        {product.stock} in stock
-                      </Badge>
                     </div>
 
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-lg font-bold text-primary">
-                        AED {product.price.toFixed(2)}
-                      </span>
+                    <div className="mt-2">
+                      <div className="text-sm">
+                        <div className="flex justify-between">
+                          <span>Iron:</span>
+                          <span className="font-medium">AED {product.ironRate.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Wash & Iron:</span>
+                          <span className="font-medium">AED {product.washAndIronRate.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Dry Clean:</span>
+                          <span className="font-medium">AED {product.dryCleanRate.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3">
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
@@ -279,7 +355,7 @@ export function ProductManagement({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onRemoveProduct(product.id)}
+                          onClick={() => handleRemoveProduct(product.id)}
                           className="text-destructive"
                         >
                           Delete

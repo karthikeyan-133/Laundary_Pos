@@ -8,6 +8,26 @@ import { Search, RotateCcw, Filter, Printer, Eye } from 'lucide-react';
 import { usePOSStore } from '@/hooks/usePOSStore';
 import { Order } from '@/types/pos';
 
+// Helper function to get service name
+const getServiceName = (service: 'iron' | 'washAndIron' | 'dryClean') => {
+  switch (service) {
+    case 'iron': return 'Iron';
+    case 'washAndIron': return 'Wash & Iron';
+    case 'dryClean': return 'Dry Clean';
+    default: return '';
+  }
+};
+
+// Helper function to get service rate
+const getServiceRate = (product: any, service: 'iron' | 'washAndIron' | 'dryClean') => {
+  switch (service) {
+    case 'iron': return product.ironRate || 0;
+    case 'washAndIron': return product.washAndIronRate || 0;
+    case 'dryClean': return product.dryCleanRate || 0;
+    default: return 0;
+  }
+};
+
 interface ReturnRecord {
   date: string;
   time: string;
@@ -52,11 +72,17 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
   }, []);
 
   // Filter orders based on search term and date range
+  // Only show orders that are NOT returned
   useEffect(() => {
     console.log('Filtering orders with:', { searchTerm, fromDate, toDate, allOrders: orders });
     
     // Filter out orders that have been returned (have status 'returned')
-    let filtered = orders.filter(order => order.status !== 'returned');
+    let filtered = orders.filter(order => {
+      // Check if order status is explicitly NOT 'returned'
+      const isNotReturned = order.status !== 'returned';
+      console.log(`Order ${order.id} - Status: ${order.status}, IsNotReturned: ${isNotReturned}`);
+      return isNotReturned;
+    });
     
     // Apply search filter
     filtered = filtered.filter(order => 
@@ -133,7 +159,8 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
     
     return selectedOrder.items.reduce((total, item) => {
       const returnQuantity = returnItems[item.id] || 0;
-      const itemTotal = (returnQuantity * item.product.price * (1 - item.discount / 100));
+      // Use ironRate as default price for returns
+      const itemTotal = (returnQuantity * item.product.ironRate * (1 - item.discount / 100));
       return total + itemTotal;
     }, 0);
   };
@@ -150,9 +177,21 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
     const itemsToReturn = selectedOrder.items
       .filter(item => (returnItems[item.id] || 0) > 0)
       .map(item => ({
-        product: item.product,
+        product: {
+          ...item.product,
+          // Ensure required fields are present
+          id: item.product.id || `unknown-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: item.product.name || 'Unknown Product',
+          ironRate: item.product.ironRate || 0,
+          washAndIronRate: item.product.washAndIronRate || 0,
+          dryCleanRate: item.product.dryCleanRate || 0,
+          barcode: item.product.barcode || '',
+          category: item.product.category || 'Unknown',
+          description: item.product.description || ''
+        },
         quantity: returnItems[item.id] || 0,
-        discount: item.discount
+        discount: item.discount,
+        service: item.service || 'iron' // Add service field
       }));
     
     console.log('Items to return:', itemsToReturn);
@@ -314,7 +353,7 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
-              max-width: 80px;
+              max-width: 120px;
             }
             .item-row {
               display: flex;
@@ -341,7 +380,7 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
           <div class="receipt-info">
             <div>Order ID: ${order.id}</div>
             <div>Date: ${new Date(order.createdAt).toLocaleString()}</div>
-            <div>Customer: ${order.customer?.name || 'N/A'}</div>
+            <div>Customer: ${order.customer?.name || 'Walk-in Customer'}</div>
           </div>
           
           <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
@@ -353,14 +392,16 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
               .filter(item => (returnItems[item.id] || 0) > 0)
               .map(item => {
                 const returnQuantity = returnItems[item.id] || 0;
-                const returnSubtotal = returnQuantity * item.product.price * (1 - item.discount / 100);
+                const serviceRate = getServiceRate(item.product, item.service);
+                const returnSubtotal = returnQuantity * serviceRate * (1 - item.discount / 100);
+
                 return `
                   <div class="item-row">
                     <div class="item-details">
-                      <div class="item-name">${item.product.name}</div>
-                      <div>${returnQuantity} × ${settings.currency}${item.product.price.toFixed(2)}</div>
+                      <div class="item-name">${item.product.name || 'Unknown Product'}</div>
+                      <div>${returnQuantity} × ${settings.currency}${Number(serviceRate).toFixed(2)}</div>
                     </div>
-                    <div class="item-amount">${settings.currency}${returnSubtotal.toFixed(2)}</div>
+                    <div class="item-amount">${settings.currency}${Number(returnSubtotal).toFixed(2)}</div>
                   </div>
                 `;
               }).join('')}
@@ -428,13 +469,18 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
       // Get the order for this return
       const order = orders.find(o => o.id === orderId);
       
-      // Format date and time
+      // Format date and time properly
       const createdAt = new Date(latestReturn.created_at);
       // Adjust for Dubai time (UTC+4)
       const dubaiTime = new Date(createdAt.getTime() + (4 * 60 * 60 * 1000));
-      const dateStr = `${dubaiTime.getDate().toString().padStart(2, '0')}-${(dubaiTime.getMonth() + 1).toString().padStart(2, '0')}-${dubaiTime.getFullYear()}`;
+      const dateStr = dubaiTime.toLocaleDateString('en-US', { 
+        timeZone: 'Asia/Dubai',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
       const timeStr = dubaiTime.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
+        hour: '2-digit', 
         minute: '2-digit', 
         hour12: true,
         timeZone: 'Asia/Dubai'
@@ -449,13 +495,17 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
       let itemDetails: string[] = [];
       
       items.forEach((item: any) => {
-        const product = item.products || {};
         const quantity = item.quantity || 0;
-        const refund = item.refund_amount || 0;
+        // Use refund_amount directly from the item, with proper fallback
+        const refund = item.refund_amount !== undefined && item.refund_amount !== null ? 
+          (typeof item.refund_amount === 'string' ? parseFloat(item.refund_amount) : item.refund_amount) : 0;
         
         totalQuantity += quantity;
         totalRefund += refund;
-        itemDetails.push(`${product.name || 'Unknown Product'} (${quantity})`);
+        
+        // Get product name with fallbacks
+        const productName = item.product_name || item.barcode || 'Unknown Product';
+        itemDetails.push(`${productName} (${quantity})`);
       });
       
       // Calculate average price
@@ -470,7 +520,7 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
         productName: itemDetails.join(', '),
         quantity: totalQuantity,
         price: avgPrice,
-        subtotal: totalRefund,
+        subtotal: totalRefund, // This should be a number
         status: 'completed',
         returnId: latestReturn.id,
         orderIdFull: orderId
@@ -481,7 +531,8 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
     if (fromDate || toDate) {
       return formattedRecords.filter(record => {
         try {
-          const recordDate = new Date(`${record.date.split('-')[2]}-${record.date.split('-')[1]}-${record.date.split('-')[0]}`);
+          // Parse the formatted date string back to a Date object
+          const recordDate = new Date(record.date);
           const from = fromDate ? new Date(fromDate) : null;
           const to = toDate ? new Date(toDate) : null;
           
@@ -581,7 +632,7 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => fetchReturns()}
+              onClick={() => { fetchReturns(); }}
               className="ml-auto"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
@@ -753,7 +804,6 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
                     <TableHead>Order ID</TableHead>
                     <TableHead>Item ID</TableHead>
                     <TableHead>Quantity</TableHead>
-                    <TableHead>Product Code</TableHead>
                     <TableHead>Product Name</TableHead>
                     <TableHead>Return Qty</TableHead>
                     <TableHead>Price</TableHead>
@@ -771,7 +821,6 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
                           <TableCell>{selectedOrder.id}</TableCell>
                           <TableCell>{item.id}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
-                          <TableCell>{item.product.sku}</TableCell>
                           <TableCell>{item.product.name}</TableCell>
                           <TableCell>
                             <Input
@@ -784,14 +833,14 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
                               disabled={returnType === 'complete'}
                             />
                           </TableCell>
-                          <TableCell>{settings?.currency} {item.product.price.toFixed(2)}</TableCell>
+                          <TableCell>{settings?.currency} {Number(item.product.ironRate).toFixed(2)}</TableCell>
                           <TableCell>Return Request Initiated</TableCell>
                         </TableRow>
                       );
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center text-gray-500">
+                      <TableCell colSpan={9} className="text-center text-gray-500">
                         No items found for this order
                       </TableCell>
                     </TableRow>
@@ -833,7 +882,7 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={fetchReturns}
+                onClick={() => fetchReturns()}
                 className="ml-auto"
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
@@ -864,8 +913,8 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
                     <TableCell>{record.orderId}</TableCell>
                     <TableCell>{record.productName}</TableCell>
                     <TableCell>{record.quantity}</TableCell>
-                    <TableCell>{settings?.currency} {record.price.toFixed(2)}</TableCell>
-                    <TableCell>{settings?.currency} {record.subtotal.toFixed(2)}</TableCell>
+                    <TableCell>{settings?.currency} {Number(record.price).toFixed(2)}</TableCell>
+                    <TableCell>{settings?.currency} {Number(record.subtotal).toFixed(2)}</TableCell>
                     <TableCell>
                       <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                         {record.status}

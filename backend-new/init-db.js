@@ -4,6 +4,48 @@ const dotenv = require('dotenv');
 const envPath = path.resolve(__dirname, '.env');
 dotenv.config({ path: envPath });
 const fs = require('fs');
+const { exec } = require('child_process');
+
+// This script will initialize the MySQL database by running the init_db.sql file
+
+console.log('Initializing MySQL database...');
+
+// Path to the SQL initialization file
+const sqlFilePath = path.join(__dirname, 'init_db.sql');
+
+// Check if the SQL file exists
+if (!fs.existsSync(sqlFilePath)) {
+  console.error('❌ SQL initialization file not found:', sqlFilePath);
+  console.log('Please make sure init_db.sql exists in the backend-new directory.');
+  process.exit(1);
+}
+
+console.log('Found SQL initialization file:', sqlFilePath);
+
+// Read the SQL file
+const sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
+
+console.log('SQL file content loaded successfully.');
+
+
+// For MySQL, we need to connect and execute the SQL commands
+// This would typically be done with a MySQL client, but for simplicity,
+// we'll use the mysql command line tool
+
+console.log('\nTo initialize your MySQL database, please follow these steps:');
+console.log('1. Make sure MySQL server is running');
+console.log('2. Open MySQL Workbench or command line MySQL client');
+console.log('3. Connect to your MySQL server');
+console.log('4. Run the init_db.sql file:');
+console.log('   - In MySQL Workbench: Open the init_db.sql file and execute it');
+console.log('   - Or from command line:');
+console.log('     mysql -u root -p < init_db.sql');
+console.log('');
+console.log('Alternatively, you can run this script with a MySQL client library to');
+console.log('automatically execute the SQL commands.');
+
+console.log('\nDatabase initialization instructions completed.');
+console.log('Please follow the steps above to set up your MySQL database.');
 
 console.log('Attempting to connect to database with the following configuration:');
 console.log('Host:', process.env.DB_HOST);

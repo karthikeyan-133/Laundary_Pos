@@ -1,37 +1,26 @@
-const { supabase } = require('./supabaseDb');
+const { query } = require('./mysqlDb');
 
-async function testSupabaseConnection() {
-  console.log('Testing Supabase connection...');
-  
+async function testConnection() {
   try {
-    // Test basic connection by getting the Supabase URL
-    console.log('Supabase URL:', supabase.supabaseUrl);
+    console.log('Testing MySQL database connection...');
     
-    // Test a simple query to see if we can connect
-    const { data, error } = await supabase
-      .from('settings')
-      .select('id')
-      .limit(1);
+    // Test the connection by running a simple query
+    const result = await query('SELECT 1 as connected');
     
-    if (error) {
-      console.log('⚠️  Connection test result: Unable to query tables');
-      console.log('This is expected if tables do not exist yet');
-      console.log('Error details:', error.message);
+    if (result.length > 0) {
+      console.log('✅ Successfully connected to MySQL database.');
+      console.log('Database is ready for use.');
     } else {
-      console.log('✅ Connection test result: Successfully connected to Supabase');
-      console.log('Settings table exists with', data.length, 'records');
+      console.log('⚠️ Connection test returned unexpected result.');
     }
-    
-    console.log('\n✅ Supabase connection test completed!');
-    console.log('\nNext steps:');
-    console.log('1. Create the required tables in your Supabase dashboard');
-    console.log('2. Run "npm run init-supabase" to initialize the database');
-    console.log('3. Start your server with "npm start"');
-    
-  } catch (err) {
-    console.error('❌ Error testing Supabase connection:', err);
+  } catch (error) {
+    console.error('❌ Error connecting to MySQL database:', error.message);
+    console.log('\nTroubleshooting steps:');
+    console.log('1. Verify your MySQL server is running');
+    console.log('2. Check your database credentials in the .env file');
+    console.log('3. Ensure the database exists');
+    console.log('4. Verify network connectivity to the database server');
   }
 }
 
-// Run the test
-testSupabaseConnection();
+testConnection();

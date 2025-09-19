@@ -1,104 +1,19 @@
-const { supabase } = require('./supabaseDb');
+const supabase = require('./supabaseClient');
 
 async function testReturns() {
   console.log('Testing returns functionality...');
   
   try {
-    // First, let's get an order to test with
-    console.log('Fetching orders...');
-    const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select('id')
-      .limit(1);
+    // Test the exact query that's failing in the returns endpoint
+    console.log('Testing returns query...');
     
-    if (ordersError) {
-      console.log('Error fetching orders:', ordersError.message);
-      return;
-    }
-    
-    if (!orders || orders.length === 0) {
-      console.log('No orders found to test with');
-      return;
-    }
-    
-    const orderId = orders[0].id;
-    console.log('Using order ID:', orderId);
-    
-    // Test creating a return
-    console.log('Creating test return...');
-    const returnData = {
-      id: 'test-return-' + Date.now(),
-      order_id: orderId,
-      reason: 'Test return',
-      refund_amount: 10.00,
-      created_at: new Date().toISOString()
-    };
-    
-    const { data: returnResult, error: returnError } = await supabase
-      .from('returns')
-      .insert([returnData])
-      .select()
-      .single();
-    
-    if (returnError) {
-      console.log('Error creating return:', returnError.message);
-      return;
-    }
-    
-    console.log('Return created successfully:', returnResult);
-    
-    // Test creating return items
-    console.log('Creating test return items...');
-    
-    // First, get a product to test with
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id')
-      .limit(1);
-    
-    if (productsError) {
-      console.log('Error fetching products:', productsError.message);
-      return;
-    }
-    
-    if (!products || products.length === 0) {
-      console.log('No products found to test with');
-      return;
-    }
-    
-    const productId = products[0].id;
-    console.log('Using product ID:', productId);
-    
-    const returnItemData = {
-      id: 'test-return-item-' + Date.now(),
-      return_id: returnResult.id,
-      product_id: productId,
-      quantity: 1,
-      refund_amount: 10.00
-    };
-    
-    const { data: returnItemResult, error: returnItemError } = await supabase
-      .from('return_items')
-      .insert([returnItemData])
-      .select()
-      .single();
-    
-    if (returnItemError) {
-      console.log('Error creating return item:', returnItemError.message);
-      return;
-    }
-    
-    console.log('Return item created successfully:', returnItemResult);
-    
-    // Test fetching returns with related data
-    console.log('Fetching returns with related data...');
-    const { data: returnsWithItems, error: fetchError } = await supabase
+    const { data, error } = await supabase
       .from('returns')
       .select(`
         *,
         return_items(
           *,
-          products(name, sku)
+          products(name, barcode, ironRate, washAndIronRate, dryCleanRate)
         ),
         orders(
           id,
@@ -106,21 +21,28 @@ async function testReturns() {
         )
       `)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(1);
     
-    if (fetchError) {
-      console.log('Error fetching returns with related data:', fetchError.message);
+    if (error) {
+      console.error('❌ Returns query failed:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
+      // Check if it's a schema cache issue
+      if (error.message && error.message.includes('sku')) {
+        console.log('💡 This is a schema cache issue. The database schema has been updated but the cache still expects the "sku" column.');
+        console.log('💡 Solution: Restart your Supabase project or wait for the schema cache to refresh.');
+      }
+      
       return;
     }
     
-    console.log('Returns with related data:', returnsWithItems);
-    
-    console.log('✅ All tests passed!');
+    console.log('✅ Returns query successful');
+    console.log('Data:', JSON.stringify(data, null, 2));
     
   } catch (err) {
-    console.error('Error testing returns:', err);
+    console.error('❌ Unexpected error:', err);
   }
 }
 
-// Run the function
 testReturns();

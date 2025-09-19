@@ -51,6 +51,26 @@ interface POSInvoiceProps {
   products: Product[];
 }
 
+// Helper function to get service name
+const getServiceName = (service: 'iron' | 'washAndIron' | 'dryClean') => {
+  switch (service) {
+    case 'iron': return 'Iron';
+    case 'washAndIron': return 'Wash & Iron';
+    case 'dryClean': return 'Dry Clean';
+    default: return '';
+  }
+};
+
+// Helper function to get service rate
+const getServiceRate = (product: Product, service: 'iron' | 'washAndIron' | 'dryClean') => {
+  switch (service) {
+    case 'iron': return product.ironRate || 0;
+    case 'washAndIron': return product.washAndIronRate || 0;
+    case 'dryClean': return product.dryCleanRate || 0;
+    default: return 0;
+  }
+};
+
 export function POSInvoice({
   cart,
   customer,
@@ -187,7 +207,7 @@ export function POSInvoice({
 
   const handleBarcodeScan = (barcode: string) => {
     // Find product by barcode
-    const product = products.find(p => p.barcode === barcode || p.sku === barcode);
+    const product = products.find(p => p.barcode === barcode);
     if (product) {
       onAddToCart(product);
       toast({
@@ -239,7 +259,7 @@ export function POSInvoice({
           <div class="receipt-info">
             <div>Order ID: ${order.id || 'N/A'}</div>
             <div>Date: ${order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}</div>
-            <div>Customer: ${order.customer?.name || 'N/A'}</div>
+            <div>Customer: ${order.customer?.name || 'Walk-in Customer'}</div>
             <div>Payment Method: ${order.paymentMethod || 'N/A'}</div>
           </div>
           
@@ -247,6 +267,7 @@ export function POSInvoice({
             <thead>
               <tr>
                 <th>Item</th>
+                <th>Service</th>
                 <th>Qty</th>
                 <th>Price</th>
                 <th>Total</th>
@@ -256,8 +277,9 @@ export function POSInvoice({
               ${(order.items || []).map(item => `
                 <tr>
                   <td>${item.product?.name || 'Unknown Item'}</td>
+                  <td>${getServiceName(item.service)}</td>
                   <td>${item.quantity || 0}</td>
-                  <td>${settings.currency} ${(item.product?.price || 0).toFixed(2)}</td>
+                  <td>${settings.currency} ${getServiceRate(item.product, item.service)}</td>
                   <td>${settings.currency} ${(item.subtotal || 0).toFixed(2)}</td>
                 </tr>
               `).join('')}
@@ -337,7 +359,7 @@ export function POSInvoice({
           <div class="receipt-info">
             <div>Order ID: ${order.id || 'N/A'}</div>
             <div>Date: ${order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}</div>
-            <div>Customer: ${order.customer?.name || 'N/A'}</div>
+            <div>Customer: ${order.customer?.name || 'Walk-in Customer'}</div>
             <div>Payment Method: ${order.paymentMethod || 'N/A'}</div>
           </div>
           
@@ -345,6 +367,7 @@ export function POSInvoice({
             <thead>
               <tr>
                 <th>Item</th>
+                <th>Service</th>
                 <th>Qty</th>
                 <th>Price</th>
                 <th>Total</th>
@@ -354,8 +377,9 @@ export function POSInvoice({
               ${(order.items || []).map(item => `
                 <tr>
                   <td>${item.product?.name || 'Unknown Item'}</td>
+                  <td>${getServiceName(item.service)}</td>
                   <td>${item.quantity || 0}</td>
-                  <td>${settings.currency} ${(item.product?.price || 0).toFixed(2)}</td>
+                  <td>${settings.currency} ${getServiceRate(item.product, item.service)}</td>
                   <td>${settings.currency} ${(item.subtotal || 0).toFixed(2)}</td>
                 </tr>
               `).join('')}
@@ -488,9 +512,9 @@ export function POSInvoice({
                 {cart.map((item) => (
                   <div key={item.id} className="flex items-center gap-2 p-2 border rounded">
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{item.product.name}</p>
+                      <p className="font-medium">{item.product.name || 'Unknown Product'}</p>
                       <p className="text-sm text-muted-foreground">
-                        {settings.currency} {item.product.price.toFixed(2)} × {item.quantity}
+                        {getServiceName(item.service)} - {settings.currency} {getServiceRate(item.product, item.service).toFixed(2)} × {item.quantity}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
@@ -516,7 +540,7 @@ export function POSInvoice({
                       <p className="font-medium">{settings.currency} {item.subtotal.toFixed(2)}</p>
                       {item.discount > 0 && (
                         <p className="text-xs text-muted-foreground line-through">
-                          {settings.currency} {(item.quantity * item.product.price).toFixed(2)}
+                          {settings.currency} {(item.quantity * getServiceRate(item.product, item.service)).toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -658,7 +682,7 @@ export function POSInvoice({
                       id: 'TEMP-' + Date.now(),
                       items: cart.map(item => ({
                         ...item,
-                        subtotal: item.quantity * item.product.price
+                        subtotal: item.quantity * getServiceRate(item.product, item.service)
                       })),
                       customer,
                       paymentMethod: paymentMethod,

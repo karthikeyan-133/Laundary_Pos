@@ -1,11 +1,12 @@
 export type Product = {
   id: string;
   name: string;
-  price: number;
+  // Remove single price field and replace with service rates
+  ironRate: number;
+  washAndIronRate: number;
+  dryCleanRate: number;
   category: string;
-  sku: string;
   barcode: string;
-  stock: number;
   description?: string;
 };
 
@@ -15,6 +16,8 @@ export type CartItem = {
   quantity: number;
   discount: number;
   subtotal: number;
+  // Add service type to cart item
+  service: 'iron' | 'washAndIron' | 'dryClean';
 };
 
 export type Customer = {

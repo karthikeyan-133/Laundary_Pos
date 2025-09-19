@@ -8,7 +8,6 @@ import { Dashboard } from '@/components/Dashboard';
 import { Reports } from '@/components/Reports';
 import { POSInvoice } from '@/components/POSInvoice';
 import { ReturnByBills } from '@/components/ReturnByBills';
-import { ReturnByItems } from '@/components/ReturnByItems';
 import { OpeningCashPopup } from '@/components/OpeningCashPopup';
 import { HomeDelivery } from '@/components/HomeDelivery'; // Add HomeDelivery component
 import { usePOSStore } from '@/hooks/usePOSStore';
@@ -28,11 +27,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Order, CartItem } from '@/types/pos';
+import { Order, CartItem, Product } from '@/types/pos';
 import { ProductManagement } from '@/components/ProductManagement';
 
 const Index = () => {
-  const [activeView, setActiveView] = useState<'pos' | 'receipt' | 'dashboard' | 'reports' | 'products' | 'return-bills' | 'return-items' | 'product-management' | 'home-delivery' | 'return-records'>('pos');
+  const [activeView, setActiveView] = useState<'pos' | 'receipt' | 'dashboard' | 'reports' | 'products' | 'return-bills' | 'product-management' | 'home-delivery' | 'return-records'>('pos');
   const [selectedOrderForReturn, setSelectedOrderForReturn] = useState<Order | null>(null);
   const [returnType, setReturnType] = useState<'complete' | 'partial' | null>(null);
   const [processedOrderId, setProcessedOrderId] = useState<string | null>(null); // Track processed order ID
@@ -106,6 +105,12 @@ const Index = () => {
           <p className="text-sm text-muted-foreground mb-6">
             Please make sure the backend server is running and database is configured correctly.
           </p>
+          {error && (error.includes('schema mismatch') || error.includes('sku')) ? (
+            <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
+              <p className="font-bold">Database Schema Issue Detected</p>
+              <p className="text-sm">Please restart your Supabase project or wait for the schema cache to refresh automatically.</p>
+            </div>
+          ) : null}
           <Button onClick={() => window.location.reload()}>
             Retry
           </Button>
@@ -123,8 +128,8 @@ const Index = () => {
     console.log('handleReturnOrder called with order:', order, 'and type:', type);
     setSelectedOrderForReturn(order);
     setReturnType(type);
-    setActiveView('return-items');
-    console.log('State updated: selectedOrderForReturn set and activeView set to return-items');
+    setActiveView('return-bills'); // Changed from 'return-items' to 'return-bills'
+    console.log('State updated: selectedOrderForReturn set and activeView set to return-bills');
   };
 
   // Callback function for when a return is processed successfully
@@ -166,6 +171,43 @@ const Index = () => {
 
   const handleCheckout = async (paymentMethod: any, cashAmount?: number, cardAmount?: number) => {
     return await createOrder(paymentMethod, cashAmount, cardAmount);
+  };
+
+  const handleAddProduct = async (product: Omit<Product, 'id'>) => {
+    try {
+      await addProduct(product);
+    } catch (error: any) {
+      console.error('Error adding product:', error);
+      // Provide more detailed error information
+      const errorMessage = error.message || "Failed to add product. Please try again.";
+      const errorDetails = error.details ? `Details: ${error.details}` : '';
+      const errorHint = error.hint ? `Hint: ${error.hint}` : '';
+      
+      alert(`${errorMessage} ${errorDetails} ${errorHint}`);
+    }
+  };
+
+  const handleEditProduct = async (product: Product) => {
+    try {
+      await editProduct(product);
+    } catch (error: any) {
+      console.error('Error editing product:', error);
+      alert(error.message || "Failed to edit product. Please try again.");
+    }
+  };
+
+  const handleRemoveProduct = async (productId: string) => {
+    try {
+      await removeProduct(productId);
+    } catch (error: any) {
+      console.error('Error removing product:', error);
+      // Provide more specific error handling for deletion issues
+      if (error.message && error.message.includes('referenced in existing')) {
+        alert('Cannot delete this product because it is referenced in existing orders or returns. To remove this product, you would need to first delete all related orders and returns.');
+      } else {
+        alert(error.message || "Failed to remove product. Please try again.");
+      }
+    }
   };
 
   // Filter out returned orders for display in reports and other components
@@ -218,7 +260,7 @@ const Index = () => {
                   Home Delivery
                 </Button>
                 <Button 
-                  variant={activeView === 'return-bills' || activeView === 'return-items' ? "default" : "ghost"} 
+                  variant={activeView === 'return-bills' ? "default" : "ghost"} // Simplified condition
                   className="flex items-center gap-2"
                   onClick={() => setActiveView('return-bills')}
                 >
@@ -261,7 +303,7 @@ const Index = () => {
                 <CardContent>
                   <ProductList
                     products={products}
-                    onAddToCart={addToCart}
+                    onAddToCart={(product, service, quantity) => addToCart(product, service, quantity)}
                     onSearch={searchProducts}
                     onAddProduct={() => setActiveView('product-management')}
                   />
@@ -289,7 +331,11 @@ const Index = () => {
                 onUnholdCart={unholdCart}
                 isCartHeld={isCartHeld}
                 currentHoldId={currentHoldId}
-                onAddToCart={addToCart}
+                onAddToCart={(product, quantity = 1) => {
+                  // For backward compatibility, we'll add with default service (iron)
+                  // In a real app, you might want to show a service selection popup here too
+                  addToCart(product, 'iron', quantity);
+                }}
                 products={products}
               />
             </div>
@@ -321,7 +367,7 @@ const Index = () => {
           </div>
         )}
 
-        {(activeView === 'return-bills' || activeView === 'return-items') && (
+        {activeView === 'return-bills' && (
           <div className="mt-6">
             <div className="flex gap-4 mb-4">
               <Button 
@@ -330,24 +376,8 @@ const Index = () => {
               >
                 Return by Bills
               </Button>
-              <Button 
-                variant={activeView === 'return-items' ? "default" : "outline"}
-                onClick={() => setActiveView('return-items')}
-              >
-                Return by Items
-              </Button>
             </div>
-            {activeView === 'return-bills' ? 
-              <ReturnByBills onReturnProcessed={handleReturnProcessed} onViewReceipt={handleViewReceipt} onPrintReceipt={handlePrintReceipt} /> : 
-              <ReturnByItems 
-                key={`${selectedOrderForReturn?.id}-${returnType}`} 
-                preselectedOrder={selectedOrderForReturn} 
-                returnType={returnType} 
-                onReturnProcessed={handleReturnProcessed}
-                onViewReceipt={handleViewReceipt}
-                onPrintReceipt={handlePrintReceipt}
-              />
-            }
+            <ReturnByBills onReturnProcessed={handleReturnProcessed} onViewReceipt={handleViewReceipt} onPrintReceipt={handlePrintReceipt} />
           </div>
         )}
 
@@ -412,7 +442,7 @@ const Index = () => {
               <CardContent>
                 <ProductList
                   products={products}
-                  onAddToCart={addToCart}
+                  onAddToCart={(product, service, quantity) => addToCart(product, service, quantity)}
                   onSearch={searchProducts}
                 />
               </CardContent>

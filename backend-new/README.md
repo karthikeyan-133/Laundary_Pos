@@ -1,80 +1,74 @@
-# Backend Deployment Guide
+# Backend (MySQL Version)
 
-This directory contains the backend API for the Tally POS application, built with Node.js and Express.
+This is the backend server for the Tally POS system, now configured to use MySQL instead of Supabase.
 
-## Local Development Setup
+## Prerequisites
 
-### Prerequisites
+1. Node.js installed
+2. MySQL Server installed (MySQL Workbench recommended)
+3. MySQL client tools
 
-1. Node.js (v16 or higher)
-2. npm (comes with Node.js)
-3. A Supabase account with a project created
+## Setup Instructions
 
-### Environment Variables
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-For local development, copy the `.env.example` file to `.env` and update the values:
+2. **Configure database**:
+   - Update the `.env` file with your MySQL database credentials
+   - Make sure your MySQL server is running
 
-```bash
-cp .env.example .env
-```
+3. **Initialize the database**:
+   ```bash
+   npm run init-db
+   ```
+   Or manually run the `init_db.sql` file in MySQL Workbench
 
-Then edit the `.env` file and replace the placeholder values with your actual Supabase credentials:
+4. **Create tables**:
+   ```bash
+   npm run create-tables
+   ```
 
-- `SUPABASE_URL` - Your Supabase project URL (e.g., https://your-project.supabase.co)
-- `SUPABASE_KEY` - Your Supabase anon key (found in your Supabase project settings)
-- `PORT` - The port for the server (optional, defaults to 3001)
+5. **Start the server**:
+   ```bash
+   npm start
+   ```
+   Or for development with auto-restart:
+   ```bash
+   npm run dev
+   ```
 
-### Installing Dependencies
+## Database Configuration
 
-All dependencies are managed in the root directory. Make sure to install them:
+The application uses the following environment variables (set in `.env`):
+- `DB_HOST`: Database host (default: localhost)
+- `DB_USER`: Database user (default: root)
+- `DB_PASSWORD`: Database password (default: empty)
+- `DB_NAME`: Database name (default: Pos_system)
+- `DB_PORT`: Database port (default: 3306)
+- `PORT`: Server port (default: 3001)
 
-```bash
-cd ..
-npm install
-```
+## API Endpoints
 
-### Running the Server Locally
+- `GET /` - Health check
+- `GET /health` - Detailed health check
+- `GET /api/products` - Get all products
+- `GET /api/products/:id` - Get product by ID
+- `POST /api/products` - Create product
+- `PUT /api/products/:id` - Update product
+- `DELETE /api/products/:id` - Delete product
+- `GET /api/customers` - Get all customers
+- `GET /api/customers/:id` - Get customer by ID
+- `POST /api/customers` - Create customer
+- `GET /api/orders` - Get all orders
+- `GET /api/orders/:id` - Get order by ID
+- `POST /api/orders` - Create order
+- `PUT /api/orders/:id` - Update order
+- `GET /api/settings` - Get application settings
+- `PUT /api/settings` - Update application settings
 
-To run the backend locally:
+## Testing
 
-```bash
-cd ..
-npm start
-```
-
-Or directly from this directory:
-
-```bash
-node server.js
-```
-
-The server will start on the port specified in your `.env` file (default: 3001).
-
-## Deployment to Vercel
-
-The backend can be deployed to Vercel as a serverless function. When deployed through the root directory's vercel.json configuration, Vercel will automatically handle the deployment of this backend.
-
-### Environment Variables
-
-The following environment variables must be set in your Vercel project:
-
-1. `SUPABASE_URL` - Your Supabase project URL
-2. `SUPABASE_KEY` - Your Supabase anon key
-3. `PORT` - The port for the server (optional, defaults to 3001)
-
-### Deployment Process
-
-1. Ensure all environment variables are set in Vercel project settings
-2. The root vercel.json file will automatically configure the backend deployment
-3. All API routes will be available at `/api/*` endpoints
-
-### API Endpoints
-
-- `/api/products` - Product management
-- `/api/customers` - Customer management
-- `/api/orders` - Order processing
-- `/api/settings` - Application settings
-
-### Supabase Integration
-
-The backend connects to a Supabase database using the Supabase JavaScript client. All database operations are performed through Supabase API calls rather than direct SQL queries.
+- `npm run test-connection` - Test database connection
+- `npm run test-api` - Test API endpoints

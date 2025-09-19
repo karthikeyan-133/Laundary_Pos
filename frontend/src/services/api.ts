@@ -54,21 +54,95 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
       // Try to parse the error as JSON
       try {
         const errorJson = JSON.parse(errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorJson.error || errorText}`);
+        // Create a more detailed error object
+        const errorObj: any = new Error(errorJson.error || errorJson.message || `HTTP error! status: ${response.status}`);
+        errorObj.details = errorJson.details || '';
+        errorObj.hint = errorJson.hint || '';
+        errorObj.status = response.status;
+        throw errorObj;
       } catch (parseError) {
         // If parsing fails, use the raw error text
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        const errorObj: any = new Error(errorText || `HTTP error! status: ${response.status}`);
+        errorObj.status = response.status;
+        throw errorObj;
       }
     }
     
     const result = await response.json();
     console.log(`API success from ${url}:`, result);
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`API request failed for ${url}:`, error);
+    // Provide a more user-friendly error message
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Please try again.');
+    } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Network error. Please check your connection and try again.');
+    }
     throw error;
   }
 }
+
+// Updated Product type to match our new structure
+type Product = {
+  id: string;
+  name: string;
+  // Remove single price field and replace with service rates
+  ironRate: number;
+  washAndIronRate: number;
+  dryCleanRate: number;
+  category: string;
+  barcode: string;
+  description?: string;
+};
+
+type CartItem = {
+  id: string;
+  product: Product;
+  quantity: number;
+  discount: number;
+  subtotal: number;
+  // Add service type to cart item
+  service: 'iron' | 'washAndIron' | 'dryClean';
+};
+
+type Customer = {
+  id: string;
+  name: string;
+  code?: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  place?: string;
+  emirate?: string;
+};
+
+type Order = {
+  id: string;
+  items: CartItem[];
+  customer: Customer;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  paymentMethod: 'cash' | 'card' | 'credit' | 'both' | 'cod';
+  cashAmount?: number; // Add cash amount for split payments
+  cardAmount?: number; // Add card amount for split payments
+  status: 'completed' | 'pending' | 'cancelled' | 'returned';
+  deliveryStatus?: 'pending' | 'in-transit' | 'delivered';
+  paymentStatus?: 'paid' | 'unpaid';
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type POSSettings = {
+  taxRate: number;
+  currency: string;
+  businessName: string;
+  businessAddress: string;
+  businessPhone: string;
+  barcodeScannerEnabled: boolean;
+};
 
 // Products API
 export const productsApi = {
@@ -82,9 +156,17 @@ export const productsApi = {
     method: 'PUT',
     body: JSON.stringify(product),
   }),
-  delete: (id: string) => apiRequest<void>(`/products/${id}`, {
-    method: 'DELETE',
-  }),
+  delete: async (id: string) => {
+    try {
+      return await apiRequest(`/products/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.error('API error deleting product:', error);
+      // Re-throw with more context
+      throw new Error(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
 };
 
 // Customers API
@@ -101,7 +183,24 @@ export const customersApi = {
 export const ordersApi = {
   getAll: async () => {
     const orders = await apiRequest<Order[]>('/orders');
-    console.log('Orders API response:', orders);
+    console.log('=== ORDERS API RESPONSE ===');
+    console.log('Raw orders data:', orders);
+    console.log('Orders count:', orders.length);
+    
+    // Log first order details if available
+    if (orders.length > 0) {
+      console.log('First order:', orders[0]);
+      console.log('First order JSON:', JSON.stringify(orders[0], null, 2));
+      
+      // Log first item details if available
+      if (orders[0].items && orders[0].items.length > 0) {
+        console.log('First item:', orders[0].items[0]);
+        console.log('First item JSON:', JSON.stringify(orders[0].items[0], null, 2));
+        console.log('First item product:', orders[0].items[0].product);
+        console.log('First item product name:', orders[0].items[0].product?.name);
+      }
+    }
+    
     return orders;
   },
   getById: (id: string) => apiRequest<Order>(`/orders/${id}`),
@@ -143,62 +242,4 @@ export const settingsApi = {
     business_phone: data.business_phone || data.businessPhone,
     barcode_scanner_enabled: data.barcode_scanner_enabled !== undefined ? data.barcode_scanner_enabled : data.barcodeScannerEnabled
   })),
-};
-
-// Types (imported from pos.ts)
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  category: string;
-  sku: string;
-  barcode: string;
-  stock: number;
-  description?: string;
-};
-
-type CartItem = {
-  id: string;
-  product: Product;
-  quantity: number;
-  discount: number;
-  subtotal: number;
-};
-
-type Customer = {
-  id: string;
-  name: string;
-  code?: string;
-  contactName?: string;
-  phone?: string;
-  email?: string;
-  place?: string;
-  emirate?: string;
-};
-
-type Order = {
-  id: string;
-  items: CartItem[];
-  customer: Customer;
-  subtotal: number;
-  discount: number;
-  tax: number;
-  total: number;
-  paymentMethod: 'cash' | 'card' | 'credit' | 'both' | 'cod';
-  cashAmount?: number; // Add cash amount for split payments
-  cardAmount?: number; // Add card amount for split payments
-  status: 'completed' | 'pending' | 'cancelled' | 'returned';
-  deliveryStatus?: 'pending' | 'in-transit' | 'delivered';
-  paymentStatus?: 'paid' | 'unpaid';
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-type POSSettings = {
-  taxRate: number;
-  currency: string;
-  businessName: string;
-  businessAddress: string;
-  businessPhone: string;
-  barcodeScannerEnabled: boolean;
 };

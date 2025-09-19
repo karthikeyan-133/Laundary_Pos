@@ -26,6 +26,26 @@ export function Cart({
   onRemoveItem,
   onClearCart
 }: CartProps) {
+  // Function to get service name for display
+  const getServiceName = (service: 'iron' | 'washAndIron' | 'dryClean') => {
+    switch (service) {
+      case 'iron': return 'Iron';
+      case 'washAndIron': return 'Wash & Iron';
+      case 'dryClean': return 'Dry Clean';
+      default: return service;
+    }
+  };
+
+  // Function to get service rate
+  const getServiceRate = (item: CartItem) => {
+    switch (item.service) {
+      case 'iron': return item.product.ironRate || 0;
+      case 'washAndIron': return item.product.washAndIronRate || 0;
+      case 'dryClean': return item.product.dryCleanRate || 0;
+      default: return 0;
+    }
+  };
+
   if (items.length === 0) {
     return (
       <Card className="h-full bg-card border-border">
@@ -72,7 +92,7 @@ export function Cart({
                   <div className="flex-1">
                     <h4 className="font-medium text-card-foreground">{item.product.name}</h4>
                     <p className="text-sm text-muted-foreground">
-                      AED {item.product.price.toFixed(2)} each
+                      {getServiceName(item.service)} - AED {getServiceRate(item).toFixed(2)} each
                     </p>
                   </div>
                   <Button

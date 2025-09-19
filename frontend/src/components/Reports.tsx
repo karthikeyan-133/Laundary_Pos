@@ -13,9 +13,13 @@ import {
   Filter,
   Download,
   Printer,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from 'lucide-react';
 import { Order, Product, POSSettings } from '@/types/pos';
+import { BillingDetails } from './BillingDetails';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface ReportsProps {
   orders: Order[];
@@ -27,13 +31,13 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
   const [activeReport, setActiveReport] = useState<
     'bill' | 'item' | 'daily' | 'delivery'
   >('bill');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null); // Add this state
   
   // Set today's date as default
   const today = new Date().toISOString().split('T')[0];
   const [fromDate, setFromDate] = useState<string>(today);
   const [toDate, setToDate] = useState<string>(today);
   const [showReturnOptions, setShowReturnOptions] = useState<boolean>(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [returnType, setReturnType] = useState<'complete' | 'partial' | null>(null);
 
   // Safe date formatting function
@@ -157,14 +161,24 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
   
   // Debug orders data structure
   if (orders.length > 0) {
-    console.log('First order structure:', {
-      id: orders[0].id,
-      hasItems: orders[0].hasOwnProperty('items'),
-      itemsType: typeof orders[0].items,
-      isArray: Array.isArray(orders[0].items),
-      itemsLength: orders[0].items ? orders[0].items.length : 0,
-      firstItem: orders[0].items && orders[0].items.length > 0 ? orders[0].items[0] : null
-    });
+    console.log('=== ORDERS DEBUG INFO ===');
+    console.log('Total orders:', orders.length);
+    console.log('First order:', orders[0]);
+    console.log('First order JSON:', JSON.stringify(orders[0], null, 2));
+    
+    // Look for the specific order mentioned in the issue
+    const problematicOrder = orders.find(order => 
+      order.items && 
+      order.items.some(item => 
+        item.product && 
+        (!item.product.name || item.product.name === 'Unknown Product')
+      )
+    );
+    
+    if (problematicOrder) {
+      console.log('Found order with Unknown Product:', problematicOrder);
+      console.log('Problematic order JSON:', JSON.stringify(problematicOrder, null, 2));
+    }
   }
 
   // Debugging: Log orders to see the data structure
@@ -294,7 +308,7 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
-              max-width: 80px;
+              max-width: 120px;
             }
             .item-row {
               display: flex;
@@ -328,7 +342,7 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
               hour: '2-digit',
               minute: '2-digit'
             })}</div>
-            <div>Customer: ${order.customer?.name || 'N/A'}</div>
+            <div>Customer: ${order.customer?.name || 'Walk-in Customer'}</div>
             <div>Payment: ${order.paymentMethod}</div>
           </div>
           
@@ -337,15 +351,96 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
           </div>
           
           <div>
-            ${order.items.map(item => `
-              <div class="item-row">
-                <div class="item-details">
-                  <div class="item-name">${item.product.name}</div>
-                  <div>${item.quantity} × ${settings.currency}${item.product.price.toFixed(2)}</div>
+            ${order.items.map(item => {
+              // Debugging: Log item and product data in receipt generation
+              console.log('Generating receipt for item:', item);
+              console.log('Receipt item product:', item.product);
+              console.log('Receipt item product name:', item.product?.name);
+              console.log('Receipt item product type:', typeof item.product);
+              console.log('Receipt item product keys:', item.product ? Object.keys(item.product) : 'No product');
+              
+              // Robust product name and price extraction with multiple fallbacks
+              let productName = 'Unknown Product';
+              let price = 0;
+              
+              try {
+                // Check multiple possible product data structures
+                if (item.product && typeof item.product === 'object') {
+                  // Extract product name with validation
+                  if (typeof item.product.name === 'string' && item.product.name.trim() !== '') {
+                    productName = item.product.name;
+                  } else if (item.product.name && typeof item.product.name === 'string') {
+                    productName = item.product.name;
+                  }
+                  
+                  // Remove any "(X items)" text that might be part of the product name
+                  if (productName && typeof productName === 'string') {
+                    productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                  }
+                  
+                  // Get the correct price based on service
+                  if (item.service) {
+                    switch (item.service) {
+                      case 'iron':
+                        price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                        break;
+                      case 'washAndIron':
+                        price = typeof item.product.washAndIronRate === 'number' ? item.product.washAndIronRate : 0;
+                        break;
+                      case 'dryClean':
+                        price = typeof item.product.dryCleanRate === 'number' ? item.product.dryCleanRate : 0;
+                        break;
+                      default:
+                        price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                    }
+                  } else {
+                    // Default to ironRate if no service specified
+                    price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                  }
+                }
+                
+                // Alternative structure check
+                if (productName === 'Unknown Product' && typeof item === 'object' && item !== null) {
+                  if (typeof (item as any).name === 'string' && (item as any).name.trim() !== '') {
+                    productName = (item as any).name;
+                  } else if ((item as any).product_name && typeof (item as any).product_name === 'string') {
+                    productName = (item as any).product_name;
+                  }
+                  
+                  // Remove any "(X items)" text that might be part of the product name
+                  if (productName && typeof productName === 'string') {
+                    productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                  }
+                }
+                
+                // Last resort: check for products property (plural) using type assertion
+                if (productName === 'Unknown Product' && (item as any).products && typeof (item as any).products === 'object') {
+                  if (typeof (item as any).products.name === 'string' && (item as any).products.name.trim() !== '') {
+                    productName = (item as any).products.name;
+                  }
+                  
+                  // Remove any "(X items)" text that might be part of the product name
+                  if (productName && typeof productName === 'string') {
+                    productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                  }
+                }
+              } catch (error) {
+                console.error('Error extracting product data for receipt generation:', error);
+              }
+              
+              console.log('Final receipt product name result:', productName);
+              console.log('Final receipt price result:', price);
+              
+              return `
+                <div class="item-row">
+                  <div class="item-details">
+                    <div class="item-name">${productName}</div>
+                    <div>${item.quantity} × ${settings.currency}${price.toFixed(2)}</div>
+                  </div>
+                  <div class="item-amount">${settings.currency}${item.subtotal.toFixed(2)}</div>
                 </div>
-                <div class="item-amount">${settings.currency}${item.subtotal.toFixed(2)}</div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
           
           <div class="divider"></div>
@@ -397,6 +492,475 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
     }
   };
 
+  // Add export to PDF function
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    
+    // Set document title
+    doc.setFontSize(18);
+    doc.text('Daily Sales Report', 14, 20);
+    
+    // Add business information if available
+    if (settings) {
+      doc.setFontSize(12);
+      doc.text(settings.businessName, 14, 30);
+      doc.text(settings.businessAddress, 14, 37);
+      doc.text(`Phone: ${settings.businessPhone}`, 14, 44);
+    }
+    
+    // Add date range information
+    doc.setFontSize(12);
+    const dateInfo = `Date Range: ${fromDate || 'All'} to ${toDate || 'All'}`;
+    doc.text(dateInfo, 14, 54);
+    
+    // Filter orders by date range for the report
+    const filteredOrdersForExport = filterOrdersByDate(orders);
+    
+    // Generate report based on active report type
+    if (activeReport === 'daily') {
+      // Group filtered orders by date
+      const dailySales: { [key: string]: { date: string, orders: number, revenue: number } } = {};
+      
+      filteredOrdersForExport.forEach(order => {
+        // Convert order date to a normalized date string for grouping
+        let orderDate: Date;
+        if (order.createdAt instanceof Date) {
+          orderDate = order.createdAt;
+        } else if (typeof order.createdAt === 'string') {
+          orderDate = new Date(order.createdAt);
+        } else {
+          return; // Skip invalid dates
+        }
+        
+        // Check if orderDate is valid
+        if (isNaN(orderDate.getTime())) {
+          return; // Skip invalid dates
+        }
+        
+        // Normalize to date only (without time) for grouping
+        const dateKey = orderDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        const displayDate = orderDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+        
+        if (dailySales[dateKey]) {
+          dailySales[dateKey].orders += 1;
+          dailySales[dateKey].revenue += order.total;
+        } else {
+          dailySales[dateKey] = {
+            date: displayDate,
+            orders: 1,
+            revenue: order.total
+          };
+        }
+      });
+
+      const dailyData = Object.values(dailySales);
+      
+      // Add table to PDF
+      autoTable(doc, {
+        startY: 60,
+        head: [['Date', 'Orders', 'Revenue (AED)', 'Avg. Order Value (AED)']],
+        body: dailyData.map(day => [
+          day.date,
+          day.orders,
+          day.revenue.toFixed(2),
+          (day.revenue / day.orders).toFixed(2)
+        ]),
+        theme: 'grid',
+        styles: {
+          fontSize: 10
+        },
+        headStyles: {
+          fillColor: [22, 160, 133]
+        }
+      });
+      
+      // Add summary
+      const totalRevenue = dailyData.reduce((sum, day) => sum + day.revenue, 0);
+      const totalOrders = dailyData.reduce((sum, day) => sum + day.orders, 0);
+      
+      doc.setFontSize(12);
+      doc.text(`Total Revenue: AED ${totalRevenue.toFixed(2)}`, 14, (doc as any).lastAutoTable.finalY + 10);
+      doc.text(`Total Orders: ${totalOrders}`, 14, (doc as any).lastAutoTable.finalY + 17);
+      doc.text(`Average Order Value: AED ${(totalRevenue / totalOrders).toFixed(2)}`, 14, (doc as any).lastAutoTable.finalY + 24);
+    } else if (activeReport === 'bill') {
+      // Export Report by Bill
+      // Create a list of items for each order for the PDF export
+      const billDetails: { 
+        transNo: string;
+        transDate: string;
+        customer: string;
+        items: string;
+        total: string;
+        paymentMethod: string;
+        cash: string;
+        card: string;
+        status: string;
+      }[] = [];
+
+      filteredOrdersForExport.forEach(order => {
+        // Calculate total items in the order
+        const totalItems = order.items ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0) : 0;
+        
+        // Get product items with service types
+        const productItems = order.items ? order.items.map((item) => {
+          // Enhanced product data extraction with multiple fallbacks
+          let productName = 'Unknown Product';
+          let serviceType = item.service || 'unknown';
+          
+          try {
+            // Check multiple possible product data structures
+            if (item.product && typeof item.product === 'object') {
+              // Extract product name with validation
+              if (typeof item.product.name === 'string' && item.product.name.trim() !== '') {
+                productName = item.product.name;
+              } else if (item.product.name && typeof item.product.name === 'string') {
+                productName = item.product.name;
+              }
+              
+              // Remove any "(X items)" text that might be part of the product name
+              if (productName && typeof productName === 'string') {
+                productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+              }
+            }
+            
+            // Alternative structure check
+            if (productName === 'Unknown Product' && typeof item === 'object' && item !== null) {
+              if (typeof (item as any).name === 'string' && (item as any).name.trim() !== '') {
+                productName = (item as any).name;
+              } else if ((item as any).product_name && typeof (item as any).product_name === 'string') {
+                productName = (item as any).product_name;
+              }
+              
+              // Remove any "(X items)" text that might be part of the product name
+              if (productName && typeof productName === 'string') {
+                productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+              }
+            }
+            
+            // Last resort: check for products property (plural) using type assertion
+            if (productName === 'Unknown Product' && (item as any).products && typeof (item as any).products === 'object') {
+              if (typeof (item as any).products.name === 'string' && (item as any).products.name.trim() !== '') {
+                productName = (item as any).products.name;
+              }
+              
+              // Remove any "(X items)" text that might be part of the product name
+              if (productName && typeof productName === 'string') {
+                productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+              }
+            }
+          } catch (error) {
+            console.error('Error extracting product data for PDF export:', error);
+          }
+          
+          // Format service type for display
+          let serviceDisplay = '';
+          switch (serviceType) {
+            case 'iron':
+              serviceDisplay = '(iron)';
+              break;
+            case 'washAndIron':
+              serviceDisplay = '(wash & iron)';
+              break;
+            case 'dryClean':
+              serviceDisplay = '(dry clean)';
+              break;
+            default:
+              serviceDisplay = `(service: ${serviceType})`;
+          }
+          
+          // Return product name with service type
+          if (productName && typeof productName === 'string' && productName.trim() !== '' && productName !== 'Unknown Product') {
+            return `${productName} ${serviceDisplay}`;
+          }
+          
+          // Fallback to Unknown Product with service type
+          return `Unknown Product ${serviceDisplay}`;
+        }) : [];
+
+        // Get unique product items (name + service combinations)
+        const uniqueProductItems = Array.from(new Set(productItems)).slice(0, 3); // Limit to first 3 for display
+
+        const itemsDisplay = uniqueProductItems.join(', ') + (uniqueProductItems.length < (order.items?.length || 0) ? '...' : '');
+        
+        // Special handling for display - if all products are "Unknown Product", show a different message
+        const displayText = uniqueProductItems.length > 0 && uniqueProductItems.every(item => item.startsWith('Unknown Product')) 
+          ? `Unknown Product` 
+          : `${itemsDisplay}`;
+        
+        billDetails.push({
+          transNo: `#${order.id.slice(-6)}`,
+          transDate: formatDate(order.createdAt),
+          customer: order.customer?.name || 'Walk-in Customer',
+          items: displayText,
+          total: `${settings?.currency} ${order.total.toFixed(2)}`,
+          paymentMethod: order.paymentMethod,
+          cash: order.paymentMethod === 'both' && order.cashAmount ? `${settings?.currency} ${order.cashAmount.toFixed(2)}` : 
+                order.paymentMethod === 'cash' ? `${settings?.currency} ${order.total.toFixed(2)}` : `${settings?.currency} 0.00`,
+          card: order.paymentMethod === 'both' && order.cardAmount ? `${settings?.currency} ${order.cardAmount.toFixed(2)}` : 
+                order.paymentMethod === 'card' ? `${settings?.currency} ${order.total.toFixed(2)}` : `${settings?.currency} 0.00`,
+          status: order.status
+        });
+      });
+
+      autoTable(doc, {
+        startY: 60,
+        head: [['Trans No', 'Trans Date', 'Customer', 'Items', 'Total', 'Payment Method', 'Cash', 'Card', 'Status']],
+        body: billDetails.map(bill => [
+          bill.transNo,
+          bill.transDate,
+          bill.customer,
+          bill.items,
+          bill.total,
+          bill.paymentMethod,
+          bill.cash,
+          bill.card,
+          bill.status
+        ]),
+        theme: 'grid',
+        styles: {
+          fontSize: 8
+        },
+        headStyles: {
+          fillColor: [22, 160, 133]
+        }
+      });
+    } else if (activeReport === 'item') {
+      // Export Report by Item
+      const itemDetails: { 
+        orderDate: string;
+        orderId: string;
+        productName: string;
+        categoryName: string;
+        quantity: number;
+        price: number;
+        subtotal: number;
+        customerName: string;
+        paymentMethod: string;
+        status: string;
+      }[] = [];
+
+      filteredOrdersForExport.forEach(order => {
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach(item => {
+            console.log('PDF export - Processing item:', item);
+            console.log('PDF export - Item product:', item.product);
+            console.log('PDF export - Item product name:', item.product?.name);
+            console.log('PDF export - Item service:', item.service);
+            
+            // Robust product data extraction with multiple fallbacks
+            let productName = 'Unknown Product';
+            let productCategory = '';
+            let price = 0;
+            let serviceType = item.service || 'unknown';
+            
+            try {
+              // Check multiple possible product data structures
+              if (item.product && typeof item.product === 'object') {
+                // Extract product name with validation
+                if (typeof item.product.name === 'string' && item.product.name.trim() !== '') {
+                  productName = item.product.name;
+                } else if (item.product.name && typeof item.product.name === 'string') {
+                  productName = item.product.name;
+                }
+                
+                // Remove any "(X items)" text that might be part of the product name
+                if (productName && typeof productName === 'string') {
+                  productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                }
+                
+                // Extract category
+                productCategory = typeof item.product.category === 'string' ? item.product.category : '';
+                
+                // Get the correct price based on service
+                if (item.service) {
+                  switch (item.service) {
+                    case 'iron':
+                      price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                      break;
+                    case 'washAndIron':
+                      price = typeof item.product.washAndIronRate === 'number' ? item.product.washAndIronRate : 0;
+                      break;
+                    case 'dryClean':
+                      price = typeof item.product.dryCleanRate === 'number' ? item.product.dryCleanRate : 0;
+                      break;
+                    default:
+                      price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                  }
+                } else {
+                  // Default to ironRate if no service specified
+                  price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                }
+              }
+              
+              // Alternative structure check
+              if (productName === 'Unknown Product' && typeof item === 'object' && item !== null) {
+                if (typeof (item as any).name === 'string' && (item as any).name.trim() !== '') {
+                  productName = (item as any).name;
+                } else if ((item as any).product_name && typeof (item as any).product_name === 'string') {
+                  productName = (item as any).product_name;
+                }
+                
+                // Remove any "(X items)" text that might be part of the product name
+                if (productName && typeof productName === 'string') {
+                  productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                }
+                
+                // Extract category from alternative structure
+                if (!(item as any).category && (item as any).product_category) {
+                  productCategory = typeof (item as any).product_category === 'string' ? (item as any).product_category : '';
+                }
+              }
+              
+              // Last resort: check for products property (plural) using type assertion
+              if (productName === 'Unknown Product' && (item as any).products && typeof (item as any).products === 'object') {
+                if (typeof (item as any).products.name === 'string' && (item as any).products.name.trim() !== '') {
+                  productName = (item as any).products.name;
+                }
+                
+                // Remove any "(X items)" text that might be part of the product name
+                if (productName && typeof productName === 'string') {
+                  productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                }
+                
+                // Extract category from products property
+                if (!(item as any).products.category && (item as any).products.product_category) {
+                  productCategory = typeof (item as any).products.product_category === 'string' ? (item as any).products.product_category : '';
+                }
+              }
+            } catch (error) {
+              console.error('Error extracting product data for PDF export:', error);
+            }
+            
+            console.log('Final PDF export product name result:', productName);
+            console.log('Final PDF export price result:', price);
+            console.log('Final PDF export service type:', serviceType);
+            
+            // Format service type for display
+            let serviceDisplay = '';
+            switch (serviceType) {
+              case 'iron':
+                serviceDisplay = '(iron)';
+                break;
+              case 'washAndIron':
+                serviceDisplay = '(wash & iron)';
+                break;
+              case 'dryClean':
+                serviceDisplay = '(dry clean)';
+                break;
+              default:
+                serviceDisplay = `(service: ${serviceType})`;
+            }
+            
+            // Create display name with service type
+            const displayProductName = productName !== 'Unknown Product' 
+              ? `${productName} ${serviceDisplay}` 
+              : productName;
+            
+            const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
+            const subtotal = typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal;
+          
+            // Format order date
+            let orderDate = '';
+            try {
+              if (order.createdAt instanceof Date) {
+                orderDate = order.createdAt.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                });
+              } else if (typeof order.createdAt === 'string') {
+                const dateObj = new Date(order.createdAt);
+                if (!isNaN(dateObj.getTime())) {
+                  orderDate = dateObj.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('Error formatting order date for PDF export:', error);
+            }
+            
+            itemDetails.push({
+              orderDate: orderDate,
+              orderId: order.id,
+              productName: displayProductName, // Use the display name with service type
+              categoryName: productCategory,
+              quantity: quantity,
+              price: price,
+              subtotal: subtotal,
+              customerName: order.customer?.name || 'Walk-in Customer',
+              paymentMethod: order.paymentMethod || '',
+              status: order.status || ''
+            });
+          });
+        }
+      });
+      
+      autoTable(doc, {
+        startY: 60,
+        head: [['Order ID', 'Date', 'Item Name (Service)', 'Category', 'Quantity', 'Price (AED)', 'Subtotal (AED)']],
+        body: itemDetails.map(item => [
+          `#${item.orderId.slice(-6)}`,
+          item.orderDate,
+          item.productName,
+          item.categoryName,
+          item.quantity,
+          item.price.toFixed(2),
+          item.subtotal.toFixed(2)
+        ]),
+        theme: 'grid',
+        styles: {
+          fontSize: 8
+        },
+        headStyles: {
+          fillColor: [22, 160, 133]
+        }
+      });
+    } else if (activeReport === 'delivery') {
+      // Export Report by Home Delivery
+      const deliveryOrders = filteredOrdersForExport.filter(order => order.paymentMethod === 'cod');
+      
+      autoTable(doc, {
+        startY: 60,
+        head: [['Order No', 'Date', 'Customer', 'Address', 'Amount (AED)', 'Status']],
+        body: deliveryOrders.map(order => [
+          `#${order.id.slice(-6)}`,
+          formatDate(order.createdAt),
+          order.customer?.name || 'Walk-in Customer',
+          [order.customer?.place, order.customer?.emirate].filter(Boolean).join(', ') || 'N/A',
+          order.total.toFixed(2),
+          order.status
+        ]),
+        theme: 'grid',
+        styles: {
+          fontSize: 10
+        },
+        headStyles: {
+          fillColor: [22, 160, 133]
+        }
+      });
+    }
+    
+    // Save the PDF
+    doc.save(`report-${activeReport}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
+  // Add this function to handle order selection
+  const handleViewOrder = (order: Order) => {
+    setSelectedOrder(order);
+  };
+
+  // Add this function to close order details
+  const handleCloseOrderDetails = () => {
+    setSelectedOrder(null);
+  };
+
   // Report by Bill
   const ReportByBill = () => (
     <Card className="bg-card border-border">
@@ -417,6 +981,8 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
                   <tr className="border-b">
                     <th className="text-left py-2">Trans No</th>
                     <th className="text-left py-2">Trans Date</th>
+                    <th className="text-left py-2">Customer</th>
+                    <th className="text-left py-2">Items</th>
                     <th className="text-left py-2">Total</th>
                     <th className="text-left py-2">Payment Method</th>
                     <th className="text-left py-2">Cash</th>
@@ -426,53 +992,182 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredOrders.map((order) => (
-                    <tr key={order.id} className="border-b">
-                      <td className="py-2">#{order.id.slice(-6)}</td>
-                      <td className="py-2">
-                        {formatDate(order.createdAt)}
-                      </td>
-                      <td className="py-2">AED {order.total.toFixed(2)}</td>
-                      <td className="py-2">
-                        <Badge variant="secondary">
-                          {order.paymentMethod}
-                        </Badge>
-                      </td>
-                      <td className="py-2">
-                        {order.paymentMethod === 'both' && order.cashAmount ? `AED ${order.cashAmount.toFixed(2)}` : 
-                         order.paymentMethod === 'cash' ? `AED ${order.total.toFixed(2)}` : 'AED 0.00'}
-                      </td>
-                      <td className="py-2">
-                        {order.paymentMethod === 'both' && order.cardAmount ? `AED ${order.cardAmount.toFixed(2)}` : 
-                         order.paymentMethod === 'card' ? `AED ${order.total.toFixed(2)}` : 'AED 0.00'}
-                      </td>
-                      <td className="py-2">
-                        <Badge variant={order.status === 'completed' ? 'default' : 'secondary'}>
-                          {order.status}
-                        </Badge>
-                      </td>
-                      <td className="py-2">
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => generateReceipt(order)}
-                          >
-                            <Printer className="h-4 w-4 mr-1" />
-                            Print
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleReturnClick(order)}
-                          >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Return
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredOrders.map((order) => {
+                    // Debugging: Log order data
+                    console.log('=== PROCESSING ORDER ===');
+                    console.log('Order ID:', order.id);
+                    console.log('Order data:', JSON.stringify(order, null, 2));
+                    console.log('Order items:', order.items);
+                    console.log('Order items type:', typeof order.items);
+                    console.log('Order items length:', order.items ? order.items.length : 'No items');
+                    console.log('Order customer:', order.customer);
+                    console.log('Order customer name:', order.customer?.name);
+                    
+                    // Calculate total items in the order
+                    const totalItems = order.items ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0) : 0;
+                    
+                    // Get unique product names with service types
+                    const productItems = order.items ? order.items.map((item, itemIndex) => {
+                      console.log(`--- Processing item ${itemIndex} ---`);
+                      console.log('Raw item data:', JSON.stringify(item, null, 2));
+                      console.log('Item product:', item.product);
+                      console.log('Item product type:', typeof item.product);
+                      console.log('Item service:', item.service);
+                      
+                      // Enhanced product data extraction with multiple fallbacks
+                      let productName = 'Unknown Product';
+                      let serviceType = item.service || 'unknown';
+                      
+                      try {
+                        // Check multiple possible product data structures
+                        if (item.product && typeof item.product === 'object') {
+                          // Extract product name with validation
+                          if (typeof item.product.name === 'string' && item.product.name.trim() !== '') {
+                            productName = item.product.name;
+                          } else if (item.product.name && typeof item.product.name === 'string') {
+                            productName = item.product.name;
+                          }
+                          
+                          // Remove any "(X items)" text that might be part of the product name
+                          if (productName && typeof productName === 'string') {
+                            productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                          }
+                        }
+                        
+                        // Alternative structure check
+                        if (productName === 'Unknown Product' && typeof item === 'object' && item !== null) {
+                          if (typeof (item as any).name === 'string' && (item as any).name.trim() !== '') {
+                            productName = (item as any).name;
+                          } else if ((item as any).product_name && typeof (item as any).product_name === 'string') {
+                            productName = (item as any).product_name;
+                          }
+                          
+                          // Remove any "(X items)" text that might be part of the product name
+                          if (productName && typeof productName === 'string') {
+                            productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                          }
+                        }
+                        
+                        // Last resort: check for products property (plural) using type assertion
+                        if (productName === 'Unknown Product' && (item as any).products && typeof (item as any).products === 'object') {
+                          if (typeof (item as any).products.name === 'string' && (item as any).products.name.trim() !== '') {
+                            productName = (item as any).products.name;
+                          }
+                          
+                          // Remove any "(X items)" text that might be part of the product name
+                          if (productName && typeof productName === 'string') {
+                            productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Error extracting product data:', error);
+                      }
+                      
+                      console.log('Extracted product name:', productName);
+                      console.log('Item service type:', serviceType);
+                      
+                      // Format service type for display
+                      let serviceDisplay = '';
+                      switch (serviceType) {
+                        case 'iron':
+                          serviceDisplay = '(iron)';
+                          break;
+                        case 'washAndIron':
+                          serviceDisplay = '(wash & iron)';
+                          break;
+                        case 'dryClean':
+                          serviceDisplay = '(dry clean)';
+                          break;
+                        default:
+                          serviceDisplay = `(service: ${serviceType})`;
+                      }
+                      
+                      // If we found a valid product name, return it with service type
+                      if (productName && typeof productName === 'string' && productName.trim() !== '' && productName !== 'Unknown Product') {
+                        console.log('Using extracted product name with service:', `${productName} ${serviceDisplay}`);
+                        return `${productName} ${serviceDisplay}`;
+                      }
+                      
+                      // Fallback to Unknown Product with service type
+                      console.log('Using fallback product name with service:', `Unknown Product ${serviceDisplay}`);
+                      return `Unknown Product ${serviceDisplay}`;
+                    }) : [];
+
+                    // Get unique product items (name + service combinations)
+                    const uniqueProductItems = Array.from(new Set(productItems)).slice(0, 3); // Limit to first 3 for display
+
+                    console.log('Product items array:', productItems);
+                    console.log('Unique product items array:', uniqueProductItems);
+                    const itemsDisplay = uniqueProductItems.join(', ') + (uniqueProductItems.length < (order.items?.length || 0) ? '...' : '');
+                    console.log('Items display string:', itemsDisplay);
+
+                    // Special handling for display - if all products are "Unknown Product", show a different message
+                    const displayText = uniqueProductItems.length > 0 && uniqueProductItems.every(item => item.startsWith('Unknown Product')) 
+                      ? `Unknown Product` 
+                      : `${itemsDisplay}`;
+                    
+                    return (
+                      <tr key={order.id} className="border-b hover:bg-muted/50">
+                        <td className="py-2">#{order.id.slice(-6)}</td>
+                        <td className="py-2">
+                          {formatDate(order.createdAt)}
+                        </td>
+                        <td className="py-2">
+                          {order.customer?.name || 'Walk-in Customer'}
+                        </td>
+                        <td className="py-2 min-w-[200px]">
+                          {displayText}
+                        </td>
+                        <td className="py-2 font-medium">{settings?.currency} {order.total.toFixed(2)}</td>
+                        <td className="py-2">
+                          <Badge variant="secondary">
+                            {order.paymentMethod}
+                          </Badge>
+                        </td>
+                        <td className="py-2">
+                          {order.paymentMethod === 'both' && order.cashAmount ? `${settings?.currency} ${order.cashAmount.toFixed(2)}` : 
+                           order.paymentMethod === 'cash' ? `${settings?.currency} ${order.total.toFixed(2)}` : `${settings?.currency} 0.00`}
+                        </td>
+                        <td className="py-2">
+                          {order.paymentMethod === 'both' && order.cardAmount ? `${settings?.currency} ${order.cardAmount.toFixed(2)}` : 
+                           order.paymentMethod === 'card' ? `${settings?.currency} ${order.total.toFixed(2)}` : `${settings?.currency} 0.00`}
+                        </td>
+                        <td className="py-2">
+                          <Badge variant={order.status === 'completed' ? 'default' : 'secondary'}>
+                            {order.status}
+                          </Badge>
+                        </td>
+                        <td className="py-2">
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => generateReceipt(order)}
+                            >
+                              <Printer className="h-4 w-4 mr-1" />
+                              Print
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleViewOrder(order)} // Change this to view order details
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleReturnClick(order)}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              Return
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -530,32 +1225,110 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
       
       order.items.forEach((item, itemIndex) => {
         console.log(`Processing item ${itemIndex + 1}:`, item);
+        console.log('Report by Item - Item product:', item.product);
+        console.log('Report by Item - Item product name:', item.product?.name);
+        console.log('Report by Item - Item product type:', typeof item.product);
+        console.log('Report by Item - Item product keys:', item.product ? Object.keys(item.product) : 'No product');
+        console.log('Report by Item - Item service:', item.service);
         
-        // Check if item exists
-        if (!item) {
-          console.log('Item is null or undefined');
-          return;
+        // Enhanced product data extraction with multiple fallbacks
+        let productName = 'Unknown Product';
+        let productCategory = '';
+        let price = 0;
+        let serviceType = item.service || 'unknown';
+        
+        try {
+          // Check multiple possible product data structures
+          if (item.product && typeof item.product === 'object') {
+            // Extract product name with validation
+            if (typeof item.product.name === 'string' && item.product.name.trim() !== '') {
+              productName = item.product.name;
+            } else if (item.product.name && typeof item.product.name === 'string') {
+              productName = item.product.name;
+            }
+            
+            // Extract category
+            productCategory = typeof item.product.category === 'string' ? item.product.category : '';
+            
+            // Get the correct price based on service
+            if (item.service) {
+              switch (item.service) {
+                case 'iron':
+                  price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                  break;
+                case 'washAndIron':
+                  price = typeof item.product.washAndIronRate === 'number' ? item.product.washAndIronRate : 0;
+                  break;
+                case 'dryClean':
+                  price = typeof item.product.dryCleanRate === 'number' ? item.product.dryCleanRate : 0;
+                  break;
+                default:
+                  price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+              }
+            } else {
+              // Default to ironRate if no service specified
+              price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+            }
+          }
+          
+          // Alternative structure check
+          if (productName === 'Unknown Product' && typeof item === 'object' && item !== null) {
+            if (typeof (item as any).name === 'string' && (item as any).name.trim() !== '') {
+              productName = (item as any).name;
+            } else if ((item as any).product_name && typeof (item as any).product_name === 'string') {
+              productName = (item as any).product_name;
+            }
+            
+            // Extract category from alternative structure
+            if (!(item as any).category && (item as any).product_category) {
+              productCategory = typeof (item as any).product_category === 'string' ? (item as any).product_category : '';
+            }
+          }
+          
+          // Last resort: check for products property (plural) using type assertion
+          if (productName === 'Unknown Product' && (item as any).products && typeof (item as any).products === 'object') {
+            if (typeof (item as any).products.name === 'string' && (item as any).products.name.trim() !== '') {
+              productName = (item as any).products.name;
+            }
+            
+            // Extract category from products property
+            if (!(item as any).products.category && (item as any).products.product_category) {
+              productCategory = typeof (item as any).products.product_category === 'string' ? (item as any).products.product_category : '';
+            }
+          }
+        } catch (error) {
+          console.error('Error extracting product data:', error);
         }
         
-        // Check if item has product property (could be 'product' or 'products')
-        let product = item.product;
-        // Handle case where backend returns 'products' instead of 'product'
-        if (!product && (item as any).products) {
-          product = (item as any).products;
+        console.log('Final Report by Item product name result:', productName);
+        console.log('Final Report by Item price result:', price);
+        console.log('Final Report by Item service type:', serviceType);
+        
+        // Format service type for display
+        let serviceDisplay = '';
+        switch (serviceType) {
+          case 'iron':
+            serviceDisplay = '(iron)';
+            break;
+          case 'washAndIron':
+            serviceDisplay = '(wash & iron)';
+            break;
+          case 'dryClean':
+            serviceDisplay = '(dry clean)';
+            break;
+          default:
+            serviceDisplay = `(service: ${serviceType})`;
         }
         
-        // Check if product exists
-        if (!product) {
-          console.log('Item has no product property');
-          console.log('Item keys:', Object.keys(item));
-          return;
-        }
+        // Create display name with service type
+        const displayProductName = productName !== 'Unknown Product' 
+          ? `${productName} ${serviceDisplay}` 
+          : productName;
         
         // Convert string values to numbers if needed
         const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
         const subtotal = typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal;
-        const price = product.price || 0;
-        
+
         // Format order date
         let orderDate = '';
         try {
@@ -579,16 +1352,15 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
           console.error('Error formatting order date:', error);
         }
         
-        // Add item details to the list
         itemDetails.push({
           orderDate: orderDate,
           orderId: order.id,
-          productName: product.name || '',
-          categoryName: product.category || '',
+          productName: displayProductName, // Use the display name with service type
+          categoryName: productCategory,
           quantity: quantity,
           price: price,
           subtotal: subtotal,
-          customerName: order.customer?.name || 'N/A',
+          customerName: order.customer?.name || 'Walk-in Customer',
           paymentMethod: order.paymentMethod || '',
           status: order.status || ''
         });
@@ -621,7 +1393,7 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
                     <tr className="border-b">
                       <th className="text-left py-2">Order ID</th>
                       <th className="text-left py-2">Date</th>
-                      <th className="text-left py-2">Item Name</th>
+                      <th className="text-left py-2">Item Name (Service)</th>
                       <th className="text-left py-2">Category</th>
                       <th className="text-left py-2">Quantity</th>
                       <th className="text-left py-2">Price</th>
@@ -778,7 +1550,7 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
                         <td className="py-2">
                           {formatDate(order.createdAt)}
                         </td>
-                        <td className="py-2">{order.customer?.name || 'Unknown Customer'}</td>
+                        <td className="py-2">{order.customer?.name || 'Walk-in Customer'}</td>
                         <td className="py-2">{[order.customer?.place, order.customer?.emirate].filter(Boolean).join(', ') || 'N/A'}</td>
                         <td className="py-2">AED {order.total.toFixed(2)}</td>
                         <td className="py-2">
@@ -800,6 +1572,28 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Add this to show order details when selected */}
+      {selectedOrder && settings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <BillingDetails 
+              order={selectedOrder} 
+              onPrint={generateReceipt} 
+              settings={{
+                currency: settings.currency,
+                businessName: settings.businessName,
+                businessAddress: settings.businessAddress,
+                businessPhone: settings.businessPhone,
+                taxRate: settings.taxRate
+              }} 
+            />
+            <div className="p-4 border-t flex justify-end">
+              <Button onClick={handleCloseOrderDetails}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Return Options Dialog */}
       {showReturnOptions && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -913,7 +1707,11 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
           <Home className="h-4 w-4" />
           Report by Home Delivery
         </Button>
-        <Button variant="outline" className="flex items-center gap-2 ml-auto">
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2 ml-auto"
+          onClick={exportToPDF}
+        >
           <Download className="h-4 w-4" />
           Export
         </Button>

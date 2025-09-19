@@ -13,6 +13,26 @@ interface ReceiptProps {
   showActions?: boolean;
 }
 
+// Helper function to get service name
+const getServiceName = (service: 'iron' | 'washAndIron' | 'dryClean') => {
+  switch (service) {
+    case 'iron': return 'Iron';
+    case 'washAndIron': return 'Wash & Iron';
+    case 'dryClean': return 'Dry Clean';
+    default: return '';
+  }
+};
+
+// Helper function to get service rate
+const getServiceRate = (product: any, service: 'iron' | 'washAndIron' | 'dryClean') => {
+  switch (service) {
+    case 'iron': return product.ironRate || 0;
+    case 'washAndIron': return product.washAndIronRate || 0;
+    case 'dryClean': return product.dryCleanRate || 0;
+    default: return 0;
+  }
+};
+
 export const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
   order,
   settings,
@@ -93,11 +113,11 @@ export const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
           {/* Customer Info */}
           <div className="space-y-1">
             <h4 className="font-semibold text-card-foreground">Customer:</h4>
-            <p className="text-sm text-card-foreground">{order.customer.name}</p>
-            {order.customer.phone && (
+            <p className="text-sm text-card-foreground">{order.customer?.name || 'Walk-in Customer'}</p>
+            {order.customer?.phone && (
               <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
             )}
-            {order.customer.email && (
+            {order.customer?.email && (
               <p className="text-sm text-muted-foreground">{order.customer.email}</p>
             )}
           </div>
@@ -107,24 +127,29 @@ export const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(({
           {/* Items */}
           <div className="space-y-3">
             <h4 className="font-semibold text-card-foreground">Items:</h4>
-            {order.items.map((item, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <p className="font-medium text-card-foreground">{item.product.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {settings.currency} {item.product.price.toFixed(2)} × {item.quantity}
-                      {item.discount > 0 && (
-                        <span className="text-warning ml-1">(-{item.discount}%)</span>
-                      )}
+            {order.items.map((item, index) => {
+              // Get the correct price based on service
+              const serviceRate = getServiceRate(item.product, item.service);
+              
+              return (
+                <div key={index} className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="font-medium text-card-foreground">{item.product.name || 'Unknown Product'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {getServiceName(item.service)} - {settings.currency} {serviceRate.toFixed(2)} × {item.quantity}
+                        {item.discount > 0 && (
+                          <span className="text-warning ml-1">(-{item.discount}%)</span>
+                        )}
+                      </p>
+                    </div>
+                    <p className="font-medium text-card-foreground">
+                      {settings.currency} {item.subtotal.toFixed(2)}
                     </p>
                   </div>
-                  <p className="font-medium text-card-foreground">
-                    {settings.currency} {item.subtotal.toFixed(2)}
-                  </p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <Separator className="bg-border" />

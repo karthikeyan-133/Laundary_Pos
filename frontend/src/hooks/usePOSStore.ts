@@ -19,6 +19,7 @@ const sampleCustomers: Customer[] = [
     id: 'default-walk-in',
     name: 'Walk-in Customer',
     code: 'WIC001',
+    contactName: '',
     phone: '',
     email: '',
     place: '',
@@ -26,14 +27,67 @@ const sampleCustomers: Customer[] = [
   }
 ];
 
-// Helper function to convert product data types
+// Helper function to convert product data types with better error handling
 const convertProductDataTypes = (product: any): Product => {
   console.log('Converting product:', product);
-  const convertedProduct = {
-    ...product,
-    price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-    stock: typeof product.stock === 'string' ? parseInt(product.stock, 10) : product.stock
+  
+  // Handle potential null/undefined values
+  if (!product) {
+    console.warn('Received null/undefined product data');
+    return {
+      id: '',
+      name: 'Unknown Product',
+      ironRate: 0,
+      washAndIronRate: 0,
+      dryCleanRate: 0,
+      category: 'Unknown',
+      barcode: '',
+      description: ''
+    };
+  }
+  
+  // Handle both camelCase and snake_case field names from backend
+  const ironRate = product.ironRate !== undefined ? product.ironRate : 
+                  product.ironrate !== undefined ? product.ironrate : 0;
+  const washAndIronRate = product.washAndIronRate !== undefined ? product.washAndIronRate : 
+                         product.washandironrate !== undefined ? product.washandironrate : 0;
+  const dryCleanRate = product.dryCleanRate !== undefined ? product.dryCleanRate : 
+                      product.drycleanrate !== undefined ? product.drycleanrate : 0;
+  
+  // Ensure all values are proper numbers
+  const safeIronRate = parseFloat(ironRate) || 0;
+  const safeWashAndIronRate = parseFloat(washAndIronRate) || 0;
+  const safeDryCleanRate = parseFloat(dryCleanRate) || 0;
+  
+  // Extract product name with multiple fallbacks
+  let productName = 'Unknown Product';
+  if (typeof product.name === 'string' && product.name.trim() !== '') {
+    productName = product.name;
+  } else if (product.product_name && typeof product.product_name === 'string' && product.product_name.trim() !== '') {
+    productName = product.product_name;
+  } else if (product.title && typeof product.title === 'string' && product.title.trim() !== '') {
+    productName = product.title;
+  }
+  
+  // Extract category with fallbacks
+  let category = 'Unknown';
+  if (typeof product.category === 'string' && product.category.trim() !== '') {
+    category = product.category;
+  } else if (product.product_category && typeof product.product_category === 'string' && product.product_category.trim() !== '') {
+    category = product.product_category;
+  }
+  
+  const convertedProduct: Product = {
+    id: product.id || '',
+    name: productName,
+    ironRate: safeIronRate,
+    washAndIronRate: safeWashAndIronRate,
+    dryCleanRate: safeDryCleanRate,
+    category: category,
+    barcode: product.barcode || '',
+    description: product.description || ''
   };
+  
   console.log('Converted product:', convertedProduct);
   return convertedProduct;
 };
@@ -80,30 +134,36 @@ const getDubaiTime = (): Date => {
   return dubaiTime;
 };
 
+// Helper function to safely convert date strings to Date objects in Dubai time
+const safeDateConversion = (dateValue: string | Date | undefined | null): Date => {
+  if (!dateValue) {
+    return getDubaiTime(); // Return current Dubai time as fallback
+  }
+  
+  if (dateValue instanceof Date) {
+    return dateValue;
+  }
+  
+  // Try to parse the string date
+  const parsedDate = new Date(dateValue);
+  
+  // Check if the parsed date is valid
+  if (isNaN(parsedDate.getTime())) {
+    return getDubaiTime(); // Return current Dubai time as fallback for invalid dates
+  }
+  
+  // Convert to Dubai time
+  const dubaiOffset = 4 * 60; // 4 hours in minutes
+  const localOffset = parsedDate.getTimezoneOffset();
+  const dubaiTime = new Date(parsedDate.getTime() + (localOffset + dubaiOffset) * 60000);
+  
+  return dubaiTime;
+};
+
 // Helper function to convert order data types
 const convertOrderDataTypes = (order: any): Order => {
-  console.log('Converting order:', order.id, 'Raw order data:', order);
-  
-  // Helper function to safely convert date strings to Date objects in Dubai time
-  const safeDateConversion = (dateValue: string | Date | undefined | null): Date => {
-    if (!dateValue) {
-      return getDubaiTime(); // Return current Dubai time as fallback
-    }
-    
-    if (dateValue instanceof Date) {
-      return dateValue;
-    }
-    
-    // Try to parse the string date
-    const parsedDate = new Date(dateValue);
-    
-    // Check if the parsed date is valid
-    if (isNaN(parsedDate.getTime())) {
-      return getDubaiTime(); // Return current Dubai time as fallback for invalid dates
-    }
-    
-    return parsedDate;
-  };
+  console.log('=== CONVERTING ORDER ===');
+  console.log('Raw order data:', JSON.stringify(order, null, 2));
   
   // Map snake_case field names from backend to camelCase expected by frontend
   const createdAt = order.created_at !== undefined ? order.created_at : order.createdAt;
@@ -117,16 +177,29 @@ const convertOrderDataTypes = (order: any): Order => {
   // Extract customer data with proper field mapping
   const customer = order.customers || order.customer || {};
   
-  // Process items array
-  const items = order.items ? order.items.map((item: any) => {
-    // Handle both 'product' and 'products' field names from backend
-    const product = item.product || item.products || {};
+  // Process items array with enhanced error handling
+  const items = order.items ? order.items.map((item: any, index: number) => {
+    console.log(`--- Converting item ${index} ---`);
+    console.log('Raw item data:', JSON.stringify(item, null, 2));
+    
+    // Handle both 'product' and 'products' field names from backend with type assertion
+    const product = item.product || (item as any).products || {};
+    console.log('Raw product data:', JSON.stringify(product, null, 2));
+    
+    const convertedProduct = convertProductDataTypes(product);
+    console.log('Converted product:', convertedProduct);
+    
+    // Ensure quantity and discount are proper numbers
+    const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
+    const discount = typeof item.discount === 'string' ? parseFloat(item.discount) : item.discount;
+    const subtotal = typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal;
     
     const processedItem = {
       ...item,
-      product: convertProductDataTypes(product),
-      subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : item.subtotal,
-      discount: typeof item.discount === 'string' ? parseFloat(item.discount) : item.discount
+      product: convertedProduct,
+      quantity: quantity || 0,
+      discount: discount || 0,
+      subtotal: subtotal || 0
     };
     console.log('Processed item:', processedItem);
     return processedItem;
@@ -134,7 +207,7 @@ const convertOrderDataTypes = (order: any): Order => {
   
   console.log('Processed items for order:', order.id, 'Items count:', items.length, 'Items:', items);
   
-  return {
+  const convertedOrder = {
     ...order,
     customer, // Use the properly extracted customer data
     paymentMethod, // Ensure correct field mapping
@@ -151,6 +224,9 @@ const convertOrderDataTypes = (order: any): Order => {
     // Ensure items array exists and convert item data types
     items
   };
+  
+  console.log('Final converted order:', convertedOrder);
+  return convertedOrder;
 };
 
 export function usePOSStore() {
@@ -187,16 +263,54 @@ export function usePOSStore() {
           settingsApi.get().catch(() => null) // Settings are optional, so we catch errors
         ]);
         
+        console.log('Raw products from API:', fetchedProducts);
+        
         // Convert data types for products
         const convertedProducts = fetchedProducts.map(convertProductDataTypes);
+        console.log('Converted products:', convertedProducts);
         setProducts(convertedProducts);
         
         // Convert data types for customers
         const convertedCustomers = fetchedCustomers.map(convertCustomerDataTypes);
-        setCustomers(convertedCustomers);
         
-        // If we have customers, set the first one as the default customer
-        if (convertedCustomers.length > 0) {
+        // If we have no customers, create a default walk-in customer
+        if (convertedCustomers.length === 0) {
+          // Create default walk-in customer
+          const defaultCustomer: Customer = {
+            id: 'default-walk-in',
+            name: 'Walk-in Customer',
+            code: 'WIC001',
+            contactName: '',
+            phone: '',
+            email: '',
+            place: '',
+            emirate: ''
+          };
+          
+          // Try to add the default customer to the database
+          try {
+            const createdCustomer = await customersApi.create({
+              name: defaultCustomer.name,
+              code: defaultCustomer.code,
+              contactName: defaultCustomer.contactName,
+              phone: defaultCustomer.phone,
+              email: defaultCustomer.email,
+              place: defaultCustomer.place,
+              emirate: defaultCustomer.emirate
+            });
+            
+            // Use the customer returned from the API (with proper ID)
+            setCustomers([createdCustomer]);
+            setCustomer(createdCustomer);
+          } catch (createError) {
+            console.warn('Failed to create default customer in database, using local default:', createError);
+            // If we can't create it in the database, use the local default
+            setCustomers([defaultCustomer]);
+            setCustomer(defaultCustomer);
+          }
+        } else {
+          // If we have customers, set the first one as the default customer
+          setCustomers(convertedCustomers);
           setCustomer(convertedCustomers[0]);
         }
         
@@ -244,32 +358,52 @@ export function usePOSStore() {
     localStorage.setItem('pos-held-carts', JSON.stringify(heldCarts));
   }, [heldCarts]);
 
-  const addToCart = (product: Product, quantity: number = 1) => {
+  const addToCart = (product: Product, service: 'iron' | 'washAndIron' | 'dryClean', quantity: number = 1) => {
     // Ensure product has correct data types before adding to cart
     const convertedProduct = convertProductDataTypes(product);
     
+    // Get the price based on the selected service
+    let price = 0;
+    switch (service) {
+      case 'iron':
+        price = convertedProduct.ironRate;
+        break;
+      case 'washAndIron':
+        price = convertedProduct.washAndIronRate;
+        break;
+      case 'dryClean':
+        price = convertedProduct.dryCleanRate;
+        break;
+    }
+    
     setCart(prev => {
-      const existingItem = prev.find(item => item.product.id === convertedProduct.id);
+      const existingItem = prev.find(item => 
+        item.product.id === convertedProduct.id && item.service === service
+      );
       
       if (existingItem) {
+        const newQuantity = existingItem.quantity + quantity;
+        // Recalculate subtotal with the correct price
+        const newSubtotal = newQuantity * price;
         return prev.map(item =>
-          item.product.id === convertedProduct.id
+          item.product.id === convertedProduct.id && item.service === service
             ? {
                 ...item,
                 product: convertedProduct,
-                quantity: item.quantity + quantity,
-                subtotal: (item.quantity + quantity) * convertedProduct.price * (1 - item.discount / 100)
+                quantity: newQuantity,
+                subtotal: newSubtotal
               }
             : item
         );
       }
 
       return [...prev, {
-        id: `cart-${Date.now()}-${convertedProduct.id}`,
+        id: `cart-${Date.now()}-${convertedProduct.id}-${service}`,
         product: convertedProduct,
         quantity,
         discount: 0,
-        subtotal: quantity * convertedProduct.price
+        subtotal: quantity * price, // Calculate subtotal correctly
+        service
       }];
     });
   };
@@ -284,27 +418,67 @@ export function usePOSStore() {
       return;
     }
 
-    setCart(prev => prev.map(item =>
-      item.id === cartItemId
-        ? {
-            ...item,
-            quantity,
-            subtotal: quantity * item.product.price * (1 - item.discount / 100)
-          }
-        : item
-    ));
+    setCart(prev => prev.map(item => {
+      if (item.id === cartItemId) {
+        // Get the price based on the item's service
+        let price = 0;
+        switch (item.service) {
+          case 'iron':
+            price = item.product.ironRate;
+            break;
+          case 'washAndIron':
+            price = item.product.washAndIronRate;
+            break;
+          case 'dryClean':
+            price = item.product.dryCleanRate;
+            break;
+        }
+        
+        // Recalculate subtotal with the correct price and apply any discount
+        const subtotalWithoutDiscount = quantity * price;
+        const discountMultiplier = (100 - item.discount) / 100;
+        const subtotal = subtotalWithoutDiscount * discountMultiplier;
+        
+        return {
+          ...item,
+          quantity,
+          subtotal: subtotal
+        };
+      }
+      return item;
+    }));
   };
 
   const updateCartItemDiscount = (cartItemId: string, discount: number) => {
-    setCart(prev => prev.map(item =>
-      item.id === cartItemId
-        ? {
-            ...item,
-            discount,
-            subtotal: item.quantity * item.product.price * (1 - discount / 100)
-          }
-        : item
-    ));
+    setCart(prev => prev.map(item => {
+      if (item.id === cartItemId) {
+        // Get the price based on the item's service
+        let price = 0;
+        switch (item.service) {
+          case 'iron':
+            price = item.product.ironRate;
+            break;
+          case 'washAndIron':
+            price = item.product.washAndIronRate;
+            break;
+          case 'dryClean':
+            price = item.product.dryCleanRate;
+            break;
+        }
+        
+        // Calculate subtotal with discount applied
+        const subtotalWithoutDiscount = item.quantity * price;
+        const discountMultiplier = (100 - discount) / 100;
+        const subtotal = subtotalWithoutDiscount * discountMultiplier;
+        
+        return {
+          ...item,
+          discount,
+          subtotal: subtotal
+        };
+      }
+      return item;
+    }));
   };
 
   const clearCart = () => {
@@ -355,7 +529,7 @@ export function usePOSStore() {
     try {
       const { subtotal, discount, tax, total } = calculateTotals();
       
-      // Prepare order data
+      // Prepare order data, ensuring all fields are properly set to null instead of undefined
       const newOrderData: any = {
         customer_id: customer.id,
         subtotal,
@@ -363,17 +537,18 @@ export function usePOSStore() {
         tax,
         total,
         payment_method: paymentMethod,
-        cash_amount: cashAmount, // Add cash amount for split payments
-        card_amount: cardAmount, // Add card amount for split payments
-        status: 'completed' as const,
-        delivery_status: undefined,
-        payment_status: undefined,
+        cash_amount: cashAmount !== undefined ? cashAmount : null, // Explicitly set to null if undefined
+        card_amount: cardAmount !== undefined ? cardAmount : null, // Explicitly set to null if undefined
+        status: 'completed',
+        delivery_status: null, // Explicitly set to null instead of undefined
+        payment_status: null, // Explicitly set to null instead of undefined
         items: cart.map(item => ({
           id: `item-${Date.now()}-${item.id}`,
           product_id: item.product.id,
           quantity: item.quantity,
           discount: item.discount,
-          subtotal: item.subtotal
+          subtotal: item.subtotal,
+          service: item.service
         }))
       };
 
@@ -386,34 +561,6 @@ export function usePOSStore() {
 
       // Send to API
       const createdOrder = await ordersApi.create(newOrderData);
-      
-      // Update product stock levels in parallel for better performance
-      const stockUpdatePromises = cart.map(async (cartItem) => {
-        const product = products.find(p => p.id === cartItem.product.id);
-        if (product) {
-          const newStock = product.stock - cartItem.quantity;
-          // Update product in database
-          await productsApi.update(cartItem.product.id, {
-            stock: newStock
-          });
-          return { productId: cartItem.product.id, newStock };
-        }
-        return null;
-      });
-      
-      // Wait for all stock updates to complete
-      const stockUpdates = await Promise.all(stockUpdatePromises);
-      
-      // Update products state with new stock levels
-      setProducts(prevProducts => 
-        prevProducts.map(product => {
-          const stockUpdate = stockUpdates.find(update => update && update.productId === product.id);
-          if (stockUpdate) {
-            return { ...product, stock: stockUpdate.newStock };
-          }
-          return product;
-        })
-      );
       
       // Clear cart immediately without waiting for orders reload
       clearCart();
@@ -458,7 +605,6 @@ export function usePOSStore() {
     return products.filter(product =>
       product.name.toLowerCase().includes(lowercaseQuery) ||
       product.category.toLowerCase().includes(lowercaseQuery) ||
-      product.sku.toLowerCase().includes(lowercaseQuery) ||
       product.barcode.toLowerCase().includes(lowercaseQuery) || // Add barcode search
       product.id.includes(query) // Direct ID match for barcode scanning
     );
@@ -534,40 +680,55 @@ export function usePOSStore() {
 
   const addProduct = async (product: Omit<Product, 'id'>) => {
     try {
-      // Convert price and stock to proper types before sending to API
+      // Ensure all rate values are proper numbers before sending
       const productWithCorrectTypes = {
         ...product,
-        price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-        stock: typeof product.stock === 'string' ? parseInt(product.stock, 10) : product.stock
+        ironRate: typeof product.ironRate === 'string' ? parseFloat(product.ironRate) : product.ironRate,
+        washAndIronRate: typeof product.washAndIronRate === 'string' ? parseFloat(product.washAndIronRate) : product.washAndIronRate,
+        dryCleanRate: typeof product.dryCleanRate === 'string' ? parseFloat(product.dryCleanRate) : product.dryCleanRate
       };
       
+      // Validate that all required fields are present
+      if (!productWithCorrectTypes.name || !productWithCorrectTypes.category || !productWithCorrectTypes.barcode) {
+        throw new Error('Missing required product fields: name, category, and barcode are required');
+      }
+      
+      // Validate that rates are valid numbers
+      if (isNaN(productWithCorrectTypes.ironRate) || 
+          isNaN(productWithCorrectTypes.washAndIronRate) || 
+          isNaN(productWithCorrectTypes.dryCleanRate)) {
+        throw new Error('Invalid rate values: all rates must be valid numbers');
+      }
+      
+      console.log('Sending product to API:', productWithCorrectTypes);
       const newProduct = await productsApi.create(productWithCorrectTypes);
-      // Convert data types for the returned product
+      
+      // Convert data types for the returned product with error handling
       const convertedProduct = convertProductDataTypes(newProduct);
       setProducts(prev => [...prev, convertedProduct]);
       return convertedProduct;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to add product:', err);
-      setError('Failed to add product');
-      // Return a temporary product if API fails
-      const tempProduct = { 
-        ...product, 
-        id: `PROD-${Date.now()}`,
-        price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-        stock: typeof product.stock === 'string' ? parseInt(product.stock, 10) : product.stock
-      } as Product;
-      setProducts(prev => [...prev, tempProduct]);
-      return tempProduct;
+      setError('Failed to add product: ' + (err.message || 'Unknown error'));
+      
+      // Re-throw the error with more details for the UI to handle
+      const errorObj = {
+        message: err.message || 'Failed to add product',
+        details: err.details || '',
+        hint: err.hint || ''
+      };
+      throw errorObj;
     }
   };
 
   const editProduct = async (updatedProduct: Product) => {
     try {
-      // Convert price and stock to proper types before sending to API
+      // Convert rates to proper types before sending to API
       const productWithCorrectTypes = {
         ...updatedProduct,
-        price: typeof updatedProduct.price === 'string' ? parseFloat(updatedProduct.price) : updatedProduct.price,
-        stock: typeof updatedProduct.stock === 'string' ? parseInt(updatedProduct.stock, 10) : updatedProduct.stock
+        ironRate: typeof updatedProduct.ironRate === 'string' ? parseFloat(updatedProduct.ironRate) : updatedProduct.ironRate,
+        washAndIronRate: typeof updatedProduct.washAndIronRate === 'string' ? parseFloat(updatedProduct.washAndIronRate) : updatedProduct.washAndIronRate,
+        dryCleanRate: typeof updatedProduct.dryCleanRate === 'string' ? parseFloat(updatedProduct.dryCleanRate) : updatedProduct.dryCleanRate
       };
       
       const product = await productsApi.update(updatedProduct.id, productWithCorrectTypes);
@@ -604,7 +765,14 @@ export function usePOSStore() {
       setCart(prev => prev.filter(item => item.product.id !== productId));
     } catch (err) {
       console.error('Failed to remove product:', err);
-      setError('Failed to remove product');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError('Failed to remove product: ' + errorMessage);
+      
+      // Provide more specific guidance for common deletion issues
+      if (errorMessage.includes('referenced in existing')) {
+        alert('Cannot delete this product because it is referenced in existing orders or returns. To remove this product, you would need to first delete all related orders and returns.');
+      }
+      
       // Still remove from local state even if API fails
       setProducts(prev => prev.filter(product => product.id !== productId));
       setCart(prev => prev.filter(item => item.product.id !== productId));
@@ -769,26 +937,65 @@ export function usePOSStore() {
         
         // Check if we can identify the product
         let productId = product.id;
-        if (!productId && product.sku) {
-          // Try to find the product in our products list by SKU
-          const matchingProduct = products.find(p => p.sku === product.sku);
+        if (!productId && product.barcode) {
+          // Try to find the product in our products list by barcode
+          const matchingProduct = products.find(p => p.barcode === product.barcode);
           if (matchingProduct) {
             productId = matchingProduct.id;
           }
         }
         
+        // If we still can't identify the product, try to find it by name as a last resort
+        if (!productId && product.name) {
+          // Try to find the product in our products list by name
+          const matchingProduct = products.find(p => p.name === product.name);
+          if (matchingProduct) {
+            productId = matchingProduct.id;
+            console.warn('Product identified by name instead of ID/barcode:', product.name);
+          }
+        }
+        
         if (!productId) {
-          console.error('Could not identify product in item at index:', i, product);
-          setError(`Could not identify product in item ${i + 1}. Please refresh the page and try again.`);
-          return null;
+          // If we still can't identify the product, create a temporary ID for processing
+          // This allows the return to be processed while logging the issue
+          productId = `temp-${Date.now()}-${i}`;
+          console.warn('Could not identify product, using temporary ID:', productId, 'Product:', product);
         }
       }
       
-      // Calculate total refund amount
+      // Calculate total refund amount using service-specific rates
       const refundAmount = items.reduce((total, item) => {
         // Handle both data structures: with 'item' property or direct properties
         const quantity = item.quantity || (item.item && item.item.quantity) || 0;
-        const price = item.product?.price || (item.item && item.item.product?.price) || 0;
+        // Get the service from the item or default to 'iron'
+        const service = item.service || (item.item && item.item.service) || 'iron';
+        // Get the correct rate based on service
+        let price = 0;
+        if (item.product) {
+          switch (service) {
+            case 'iron':
+              price = item.product.ironRate || 0;
+              break;
+            case 'washAndIron':
+              price = item.product.washAndIronRate || 0;
+              break;
+            case 'dryClean':
+              price = item.product.dryCleanRate || 0;
+              break;
+          }
+        } else if (item.item && item.item.product) {
+          switch (service) {
+            case 'iron':
+              price = item.item.product.ironRate || 0;
+              break;
+            case 'washAndIron':
+              price = item.item.product.washAndIronRate || 0;
+              break;
+            case 'dryClean':
+              price = item.item.product.dryCleanRate || 0;
+              break;
+          }
+        }
         const discount = item.discount || (item.item && item.item.discount) || 0;
         const refund = quantity * price * (1 - discount / 100);
         console.log('Item refund calculation:', { quantity, price, discount, refund });
@@ -806,7 +1013,23 @@ export function usePOSStore() {
           // Handle both data structures: with 'item' property or direct properties
           const product = item.product || (item.item && item.item.product);
           const quantity = item.quantity || (item.item && item.item.quantity) || 0;
-          const price = product?.price || 0;
+          // Get the service from the item or default to 'iron'
+          const service = item.service || (item.item && item.item.service) || 'iron';
+          // Get the correct rate based on service
+          let price = 0;
+          if (product) {
+            switch (service) {
+              case 'iron':
+                price = product.ironRate || 0;
+                break;
+              case 'washAndIron':
+                price = product.washAndIronRate || 0;
+                break;
+              case 'dryClean':
+                price = product.dryCleanRate || 0;
+                break;
+            }
+          }
           const discount = item.discount || (item.item && item.item.discount) || 0;
           const refund = quantity * price * (1 - discount / 100);
           
@@ -818,27 +1041,39 @@ export function usePOSStore() {
           }
           
           // Find the actual product ID from our products list
-          // This ensures we use the real database ID rather than just the SKU
+          // This ensures we use the real database ID rather than just the barcode
           let productId = product.id;
-          if (!productId && product.sku) {
-            // Try to find the product in our products list by SKU
-            const matchingProduct = products.find(p => p.sku === product.sku);
+          if (!productId && product.barcode) {
+            // Try to find the product in our products list by barcode
+            const matchingProduct = products.find(p => p.barcode === product.barcode);
             if (matchingProduct) {
               productId = matchingProduct.id;
             }
           }
           
+          // If we still can't identify the product, try to find it by name as a last resort
+          if (!productId && product.name) {
+            // Try to find the product in our products list by name
+            const matchingProduct = products.find(p => p.name === product.name);
+            if (matchingProduct) {
+              productId = matchingProduct.id;
+              console.warn('Product identified by name instead of ID/barcode:', product.name);
+            }
+          }
+          
+          // If we still can't identify the product, create a temporary ID for processing
           if (!productId) {
-            throw new Error(`Could not identify product for return item: ${product.name || product.sku}`);
+            productId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            console.warn('Could not identify product, using temporary ID:', productId, 'Product:', product);
           }
           
           // Validate data types
           if (typeof quantity !== 'number' || quantity <= 0) {
-            throw new Error(`Invalid quantity for product ${product.name || product.sku}: ${quantity}`);
+            throw new Error(`Invalid quantity for product ${product.name || product.barcode}: ${quantity}`);
           }
           
           if (typeof refund !== 'number' || refund < 0) {
-            throw new Error(`Invalid refund amount for product ${product.name || product.sku}: ${refund}`);
+            throw new Error(`Invalid refund amount for product ${product.name || product.barcode}: ${refund}`);
           }
           
           return {
@@ -868,50 +1103,6 @@ export function usePOSStore() {
       console.log('Sending return data to API');
       const createdReturn = await returnsApi.create(returnData);
       console.log('Return created via API:', createdReturn);
-      
-      // Update product stock levels
-      const updatedProducts = [...products];
-      for (const item of items) {
-        // Handle both data structures: with 'item' property or direct properties
-        const product = item.product || (item.item && item.item.product);
-        const quantity = item.quantity || (item.item && item.item.quantity) || 0;
-        
-        // Find the actual product ID from our products list
-        // This ensures we use the real database ID rather than just the SKU
-        let productId = product.id;
-        if (!productId && product.sku) {
-          // Try to find the product in our products list by SKU
-          const matchingProduct = products.find(p => p.sku === product.sku);
-          if (matchingProduct) {
-            productId = matchingProduct.id;
-          }
-        }
-        
-        if (!productId) {
-          console.error('Could not identify product for stock update:', product);
-          continue;
-        }
-        
-        const productIndex = updatedProducts.findIndex(p => p.id === productId);
-        if (productIndex !== -1) {
-          updatedProducts[productIndex] = {
-            ...updatedProducts[productIndex],
-            stock: updatedProducts[productIndex].stock + quantity
-          };
-          console.log('Updating product stock in database:', productId, 'New stock:', updatedProducts[productIndex].stock);
-          
-          // Update product in database
-          try {
-            await productsApi.update(updatedProducts[productIndex].id, {
-              stock: updatedProducts[productIndex].stock
-            });
-            console.log('Product stock updated in database:', productId);
-          } catch (updateError) {
-            console.error('Failed to update product stock in database:', updateError);
-          }
-        }
-      }
-      setProducts(updatedProducts);
       
       // Update the order status to "returned" to indicate it has been returned
       try {
@@ -959,7 +1150,14 @@ export function usePOSStore() {
       return fetchedReturns;
     } catch (err) {
       console.error('Failed to fetch returns:', err);
-      setError('Failed to fetch returns: ' + (err as Error).message);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError('Failed to fetch returns: ' + errorMessage);
+      
+      // Provide more specific guidance for schema cache issues
+      if (errorMessage.includes('schema mismatch') || errorMessage.includes('sku')) {
+        alert('Database schema mismatch detected. Please restart your Supabase project or wait for the schema cache to refresh automatically.');
+      }
+      
       return [];
     }
   };

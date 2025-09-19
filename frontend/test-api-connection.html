@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test API Connection</title>
+</head>
+<body>
+    <h1>Test API Connection</h1>
+    <button id="testReturns">Test Returns API</button>
+    <button id="testProducts">Test Products API</button>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('testReturns').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing Returns API...';
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/returns');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<h3>Returns API Success:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<h3 style="color: red;">Returns API Error:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<h3 style="color: red;">Returns API Network Error:</h3><p>${error.message}</p>`;
+            }
+        });
+        
+        document.getElementById('testProducts').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing Products API...';
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/products');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<h3>Products API Success:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<h3 style="color: red;">Products API Error:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<h3 style="color: red;">Products API Network Error:</h3><p>${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>

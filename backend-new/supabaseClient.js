@@ -19,8 +19,14 @@ if (!isVercel) {
   const envPath = path.resolve(__dirname, '.env');
   dotenv.config({ path: envPath });
   console.log('Environment: Local Development');
+  console.log('Loaded environment variables:');
+  console.log('- SUPABASE_URL:', process.env.SUPABASE_URL ? 'SET' : 'NOT SET');
+  console.log('- SUPABASE_KEY:', process.env.SUPABASE_KEY ? 'SET' : 'NOT SET');
 } else {
   console.log('Environment: Vercel');
+  console.log('Vercel environment variables:');
+  console.log('- SUPABASE_URL:', process.env.SUPABASE_URL ? 'SET' : 'NOT SET');
+  console.log('- SUPABASE_KEY:', process.env.SUPABASE_KEY ? 'SET' : 'NOT SET');
 }
 
 console.log('Supabase URL:', process.env.SUPABASE_URL || 'Not set');
@@ -53,12 +59,15 @@ if (supabaseUrl && supabaseKey) {
   try {
     // Validate that the URL is valid
     if (supabaseUrl !== 'your_supabase_project_url_here' && supabaseUrl.startsWith('http')) {
+      console.log('Creating Supabase client with URL:', supabaseUrl);
       supabase = createClient(supabaseUrl, supabaseKey, {
         auth: {
           persistSession: false
         }
       });
+      console.log('Supabase client created successfully');
     } else {
+      console.error('Invalid Supabase URL:', supabaseUrl);
       supabase = null;
     }
   } catch (error) {
@@ -116,6 +125,7 @@ async function testConnection() {
       return;
     }
     
+    console.log('Testing Supabase connection...');
     const { data, error } = await supabase
       .from('settings')
       .select('id')

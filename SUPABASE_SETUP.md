@@ -52,11 +52,11 @@ In your Supabase dashboard:
 CREATE TABLE products (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  price NUMERIC NOT NULL,
+  ironRate NUMERIC NOT NULL,
+  washAndIronRate NUMERIC NOT NULL,
+  dryCleanRate NUMERIC NOT NULL,
   category TEXT,
-  sku TEXT UNIQUE,
   barcode TEXT,
-  stock INTEGER DEFAULT 0,
   description TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
