@@ -15,7 +15,7 @@ const getApiBaseUrl = () => {
       // Return the specific backend URL for Vercel deployments
       return 'https://pos-laundry-backend.vercel.app';
     } else {
-      // For local development - changed from port 3000 to 3004
+      // For local development - use localhost:3004
       return 'http://localhost:3004';
     }
   }
@@ -34,7 +34,6 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
   
   console.log(`Making API request to: ${url}`, options);
   
-  // Add credentials to requests for CORS
   const config: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
@@ -43,8 +42,9 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     // Add timeout to prevent hanging requests
     signal: AbortSignal.timeout(15000), // 15 second timeout
     ...options,
-    // Ensure credentials are included for CORS requests
-    credentials: 'include'
+    // Only include credentials for same-origin requests
+    // For cross-origin requests, we'll rely on CORS headers
+    credentials: 'same-origin'
   };
 
   try {

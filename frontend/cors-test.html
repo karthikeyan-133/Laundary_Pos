@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>CORS Test</h1>
+    <button onclick="testCORS()">Test CORS Request</button>
+    <div id="result"></div>
+
+    <script>
+        async function testCORS() {
+            const resultDiv = document.getElementById('result');
+            try {
+                const response = await fetch('http://localhost:3004/api/products', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    // Don't include credentials to avoid the CORS issue
+                    credentials: 'omit'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = '<p style="color: green;">Success: ' + JSON.stringify(data[0] || data) + '</p>';
+                } else {
+                    resultDiv.innerHTML = '<p style="color: red;">Error: ' + response.status + ' ' + response.statusText + '</p>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+                console.error('CORS Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

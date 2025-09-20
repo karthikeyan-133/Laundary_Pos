@@ -27,28 +27,24 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 console.log('Server configured to run on port:', PORT);
 
-// Enhanced CORS configuration to handle all origins properly
-const corsOptions = {
+// Configure CORS properly to handle credentials
+app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // List of allowed origins
-    const allowedOrigins = [
-      'http://localhost:8080',     // Your local development server
-      'http://localhost:3000',     // Common React dev server
-      'http://localhost:3004',     // Backend dev server
-      'http://127.0.0.1:8080',     // Alternative localhost
-      'https://pos-laundry-tau.vercel.app',  // Your frontend deployment
-      'https://pos-laundry-backend.vercel.app' // Your backend deployment
-    ];
-    
-    // Check if origin is in allowed list or is a Vercel app
-    if (allowedOrigins.includes(origin) || origin.includes('.vercel.app')) {
+    // Allow localhost for development
+    if (origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1) {
       return callback(null, true);
     }
     
-    // Allow any origin in development environment
+    // Allow Vercel deployments - specifically allow the frontend domain
+    if (origin === 'https://pos-laundry-tau.vercel.app' || 
+        origin.indexOf('.vercel.app') !== -1) {
+      return callback(null, true);
+    }
+    
+    // Allow any other origin in development
     if (process.env.NODE_ENV !== 'production') {
       console.log('Allowing origin in development:', origin);
       return callback(null, true);
@@ -60,40 +56,18 @@ const corsOptions = {
   },
   credentials: true,
   optionsSuccessStatus: 200
-};
+}));
 
-// Apply CORS middleware with our options
-app.use(cors(corsOptions));
-
-// Additional explicit CORS headers middleware for all responses
-app.use((req, res, next) => {
-  // Set CORS headers - use dynamic origin if available, otherwise *
-  const origin = req.get('Origin');
-  res.setHeader('Access-Control-Allow-Origin', origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  
-  // Handle preflight requests immediately
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  
-  next();
-});
-
-// Explicitly handle all OPTIONS requests
+// Handle preflight requests explicitly
 app.options('*', (req, res) => {
-  const origin = req.get('Origin');
-  res.setHeader('Access-Control-Allow-Origin', origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  res.status(200).end();
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Max-Age', '86400');
+  res.sendStatus(200);
 });
+
+// Remove the previous middleware that was setting wildcard CORS headers
+// The cors middleware above will handle all CORS headers properly
 
 app.use(express.json());
 
