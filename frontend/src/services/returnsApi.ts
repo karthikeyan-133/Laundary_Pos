@@ -59,8 +59,8 @@ export const returnsApi = {
       
       for (let i = 0; i < returnData.items.length; i++) {
         const item = returnData.items[i];
-        if (!item.product_id) {
-          throw new Error(`Product ID is required for item ${i + 1}`);
+        if (!item.product_id || item.product_id.trim() === '') {
+          throw new Error(`Product ID is required for item ${i + 1}. Please ensure all products have valid IDs.`);
         }
         if (typeof item.quantity !== 'number' || item.quantity <= 0) {
           throw new Error(`Valid quantity is required for item ${i + 1}`);

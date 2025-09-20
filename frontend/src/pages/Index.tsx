@@ -150,17 +150,7 @@ const Index = () => {
     
     // Prepare items for complete return (all items with full quantity)
     const itemsToReturn = order.items.map(item => ({
-      product: {
-        ...item.product,
-        id: item.product.id || `unknown-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        name: item.product.name || 'Unknown Product',
-        ironRate: item.product.ironRate || 0,
-        washAndIronRate: item.product.washAndIronRate || 0,
-        dryCleanRate: item.product.dryCleanRate || 0,
-        barcode: item.product.barcode || '',
-        category: item.product.category || 'Unknown',
-        description: item.product.description || ''
-      },
+      product: item.product, // Use the actual product from the order item
       quantity: item.quantity,
       discount: item.discount,
       service: item.service || 'iron'

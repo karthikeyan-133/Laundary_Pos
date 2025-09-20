@@ -182,11 +182,21 @@ const convertOrderDataTypes = (order: any): Order => {
     console.log(`--- Converting item ${index} ---`);
     console.log('Raw item data:', JSON.stringify(item, null, 2));
     
-    // Handle both 'product' and 'products' field names from backend with type assertion
-    const product = item.product || (item as any).products || {};
-    console.log('Raw product data:', JSON.stringify(product, null, 2));
+    // Extract product data from the item fields (product info is embedded in order items)
+    const productData = {
+      id: item.product_id || '',
+      name: item.product_name || item.name || 'Unknown Product',
+      ironRate: typeof item.ironRate === 'string' ? parseFloat(item.ironRate) : item.ironRate || 0,
+      washAndIronRate: typeof item.washAndIronRate === 'string' ? parseFloat(item.washAndIronRate) : item.washAndIronRate || 0,
+      dryCleanRate: typeof item.dryCleanRate === 'string' ? parseFloat(item.dryCleanRate) : item.dryCleanRate || 0,
+      category: item.category || 'Unknown',
+      barcode: item.barcode || '',
+      description: item.description || ''
+    };
     
-    const convertedProduct = convertProductDataTypes(product);
+    console.log('Extracted product data:', JSON.stringify(productData, null, 2));
+    
+    const convertedProduct = convertProductDataTypes(productData);
     console.log('Converted product:', convertedProduct);
     
     // Ensure quantity and discount are proper numbers
@@ -971,28 +981,17 @@ export function usePOSStore() {
         const service = item.service || (item.item && item.item.service) || 'iron';
         // Get the correct rate based on service
         let price = 0;
-        if (item.product) {
+        const product = item.product || (item.item && item.item.product);
+        if (product) {
           switch (service) {
             case 'iron':
-              price = item.product.ironRate || 0;
+              price = (typeof product.ironRate === 'string' ? parseFloat(product.ironRate) : product.ironRate) || 0;
               break;
             case 'washAndIron':
-              price = item.product.washAndIronRate || 0;
+              price = (typeof product.washAndIronRate === 'string' ? parseFloat(product.washAndIronRate) : product.washAndIronRate) || 0;
               break;
             case 'dryClean':
-              price = item.product.dryCleanRate || 0;
-              break;
-          }
-        } else if (item.item && item.item.product) {
-          switch (service) {
-            case 'iron':
-              price = item.item.product.ironRate || 0;
-              break;
-            case 'washAndIron':
-              price = item.item.product.washAndIronRate || 0;
-              break;
-            case 'dryClean':
-              price = item.item.product.dryCleanRate || 0;
+              price = (typeof product.dryCleanRate === 'string' ? parseFloat(product.dryCleanRate) : product.dryCleanRate) || 0;
               break;
           }
         }
@@ -1020,13 +1019,13 @@ export function usePOSStore() {
           if (product) {
             switch (service) {
               case 'iron':
-                price = product.ironRate || 0;
+                price = (typeof product.ironRate === 'string' ? parseFloat(product.ironRate) : product.ironRate) || 0;
                 break;
               case 'washAndIron':
-                price = product.washAndIronRate || 0;
+                price = (typeof product.washAndIronRate === 'string' ? parseFloat(product.washAndIronRate) : product.washAndIronRate) || 0;
                 break;
               case 'dryClean':
-                price = product.dryCleanRate || 0;
+                price = (typeof product.dryCleanRate === 'string' ? parseFloat(product.dryCleanRate) : product.dryCleanRate) || 0;
                 break;
             }
           }
@@ -1040,9 +1039,10 @@ export function usePOSStore() {
             throw new Error('Product is missing for return item');
           }
           
-          // Find the actual product ID from our products list
-          // This ensures we use the real database ID rather than just the barcode
+          // Use the actual product ID, with fallbacks
           let productId = product.id;
+          
+          // If we don't have a product ID, try to find it in our products list
           if (!productId && product.barcode) {
             // Try to find the product in our products list by barcode
             const matchingProduct = products.find(p => p.barcode === product.barcode);
@@ -1052,7 +1052,7 @@ export function usePOSStore() {
           }
           
           // If we still can't identify the product, try to find it by name as a last resort
-          if (!productId && product.name) {
+          if (!productId && product.name && product.name !== 'Unknown Product') {
             // Try to find the product in our products list by name
             const matchingProduct = products.find(p => p.name === product.name);
             if (matchingProduct) {
@@ -1061,10 +1061,9 @@ export function usePOSStore() {
             }
           }
           
-          // If we still can't identify the product, create a temporary ID for processing
+          // If we still can't identify the product, we can't process the return
           if (!productId) {
-            productId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            console.warn('Could not identify product, using temporary ID:', productId, 'Product:', product);
+            throw new Error(`Could not identify product: ${product.name || product.barcode || 'Unknown Product'}. Product ID is required for return processing.`);
           }
           
           // Validate data types
