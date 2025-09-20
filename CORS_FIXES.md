@@ -6,6 +6,7 @@
 2. **Improper Vercel routing**: Some API routes were being handled by separate files instead of the main server.js
 3. **Missing Access-Control-Allow-Origin header**: The error message indicated that the header was not being set properly
 4. **Serverless function CORS handling**: Vercel serverless functions need explicit CORS header configuration
+5. **Database connection issues**: Serverless functions were not properly connecting to the MySQL database
 
 ## Fixes Applied
 
@@ -36,13 +37,21 @@ res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
 res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
 ```
 
-### 3. Updated Vercel Configuration (`vercel.json`)
+### 3. Fixed Database Connection in Serverless Functions
+
+Updated each serverless function to properly connect to the MySQL database:
+- Added proper database connection initialization using `mysql2/promise`
+- Added environment variable loading with `dotenv`
+- Added proper connection cleanup in the `finally` block
+- Added detailed error logging for debugging
+
+### 4. Updated Vercel Configuration (`vercel.json`)
 
 - Added explicit routes for each API endpoint to be handled by the corresponding serverless function
 - Ensured all API requests are handled by functions that properly set CORS headers
 - Maintained fallback routing to the main server.js for any unmatched routes
 
-### 4. Backend CORS Configuration (`backend-new/server.js`)
+### 5. Backend CORS Configuration (`backend-new/server.js`)
 
 - Updated allowed origins to include the correct frontend domains:
   - `https://pos-laundry-ajish.vercel.app` (previous domain)
@@ -52,11 +61,16 @@ res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content
 - Added a simple middleware to ensure CORS headers are always set
 - Ensured all API endpoints properly respond with CORS headers
 
+### 6. Environment Configuration
+
+- Created `backend-new/.env` file with proper MySQL database configuration for local development
+- Ensured environment variables are properly loaded in serverless functions
+
 ## Testing the Fix
 
 1. Deploy both frontend and backend to Vercel
 2. Visit your frontend URL: `https://pos-laundry-eight.vercel.app`
-3. The API requests should now work without CORS errors
+3. The API requests should now work without CORS errors or 500 Internal Server Errors
 
 ## Additional Notes
 
@@ -71,7 +85,12 @@ res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content
    - Check the browser console for specific error messages
    - Ensure both frontend and backend are deployed and accessible
 
-2. **If API requests still fail**:
-   - Check that the backend is running and accessible at `https://pos-laundry-backend.vercel.app`
+2. **If API requests still fail with 500 errors**:
+   - Check that the database environment variables are properly set in the Vercel dashboard:
+     - `DB_HOST`
+     - `DB_USER`
+     - `DB_PASSWORD`
+     - `DB_NAME`
+     - `DB_PORT`
    - Verify database connections are working
    - Check Vercel logs for any deployment errors

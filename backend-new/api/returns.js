@@ -1,22 +1,38 @@
 // Vercel serverless function for returns API
-const db = require('../mysqlDb');
+const mysql = require('mysql2/promise');
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load environment variables
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 module.exports = async (req, res) => {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  let connection;
   
   try {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+    
+    // Create database connection
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'Pos_system',
+      port: process.env.DB_PORT || 3306,
+    });
+    
     if (req.method === 'GET') {
       // GET all returns with order and customer information
-      const returns = await db.query(`
+      const [returns] = await connection.execute(`
         SELECT r.*, o.total as order_total, c.name as customer_name, c.phone as customer_phone
         FROM returns r
         LEFT JOIN orders o ON r.order_id = o.id
@@ -26,7 +42,7 @@ module.exports = async (req, res) => {
       
       // For each return, get its items with product information
       const returnsWithItems = await Promise.all(returns.map(async (returnRecord) => {
-        const items = await db.query(`
+        const [items] = await connection.execute(`
           SELECT ri.*, p.name as product_name, p.category, p.description, p.barcode
           FROM return_items ri
           LEFT JOIN products p ON ri.product_id = p.id
@@ -43,5 +59,9 @@ module.exports = async (req, res) => {
   } catch (err) {
     console.error('Error in returns API:', err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
   }
 };

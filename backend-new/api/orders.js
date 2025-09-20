@@ -1,22 +1,38 @@
 // Vercel serverless function for orders API
-const db = require('../mysqlDb');
+const mysql = require('mysql2/promise');
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load environment variables
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 module.exports = async (req, res) => {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  let connection;
   
   try {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+    
+    // Create database connection
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'Pos_system',
+      port: process.env.DB_PORT || 3306,
+    });
+    
     if (req.method === 'GET') {
       // GET all orders with customer information
-      const orders = await db.query(`
+      const [orders] = await connection.execute(`
         SELECT o.*, c.name as customer_name, c.code as customer_code, c.phone as customer_phone 
         FROM orders o 
         LEFT JOIN customers c ON o.customer_id = c.id 
@@ -25,7 +41,7 @@ module.exports = async (req, res) => {
       
       // For each order, get its items with product information
       const ordersWithItems = await Promise.all(orders.map(async (order) => {
-        const items = await db.query(`
+        const [items] = await connection.execute(`
           SELECT oi.*, p.name as product_name, p.ironRate, p.washAndIronRate, p.dryCleanRate, p.category, p.description, p.barcode
           FROM order_items oi
           LEFT JOIN products p ON oi.product_id = p.id
@@ -42,5 +58,9 @@ module.exports = async (req, res) => {
   } catch (err) {
     console.error('Error in orders API:', err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
   }
 };
