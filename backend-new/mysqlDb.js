@@ -2,23 +2,29 @@ const mysql = require('mysql2');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables
-const envPath = path.resolve(__dirname, '.env');
-dotenv.config({ path: envPath });
+// Load environment variables only in local development
+// Vercel will provide environment variables directly
+const isVercel = !!process.env.VERCEL;
+if (!isVercel) {
+  const envPath = path.resolve(__dirname, '.env');
+  dotenv.config({ path: envPath });
+}
 
 console.log('Attempting to connect to MySQL database with the following configuration:');
 console.log('Host:', process.env.DB_HOST || 'localhost');
 console.log('User:', process.env.DB_USER || 'root');
 console.log('Database:', process.env.DB_NAME || 'Pos_system');
 console.log('Port:', process.env.DB_PORT || 3306);
-console.log('Env file path:', envPath);
+console.log('Running on Vercel:', !!isVercel);
 
 // Check if environment variables are loaded
 if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_NAME) {
   console.error('❌ Environment variables are not loaded properly!');
-  console.log('Please check that your .env file exists in the backend directory with the correct values.');
+  console.log('Please check that your environment variables are set in Vercel dashboard.');
   console.log('Current working directory:', process.cwd());
-  console.log('Expected .env path:', envPath);
+  if (!isVercel) {
+    console.log('Expected .env path:', path.resolve(__dirname, '.env'));
+  }
   process.exit(1);
 }
 
