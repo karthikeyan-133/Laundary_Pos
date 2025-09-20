@@ -27,8 +27,7 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 console.log('Server configured to run on port:', PORT);
 
-// Vercel-specific CORS configuration
-// This is the recommended approach for Vercel deployments
+// Comprehensive CORS middleware - this should be the first middleware
 app.use((req, res, next) => {
   // Set CORS headers for all responses
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,7 +35,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.setHeader('Access-Control-Max-Age', '86400');
   
-  // Handle preflight requests
+  // Handle preflight requests immediately
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -45,7 +44,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// We still include the cors middleware for additional compatibility
+// Additional CORS middleware for compatibility
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -75,6 +74,15 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 200
 }));
+
+// Explicitly handle all OPTIONS requests
+app.options('*', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.status(200).end();
+});
 
 app.use(express.json());
 

@@ -22,6 +22,15 @@ router.use((req, res, next) => {
   next();
 });
 
+// Explicitly handle OPTIONS requests
+router.options('*', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.status(200).end();
+});
+
 // We still include general CORS handling for compatibility
 router.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
