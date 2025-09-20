@@ -27,25 +27,25 @@ const app = express();
 const PORT = process.env.PORT || 3003;
 console.log('Server configured to run on port:', PORT);
 
-// Middleware
-// Set CORS headers explicitly
+// Vercel-specific CORS configuration
+// This is the recommended approach for Vercel deployments
 app.use((req, res, next) => {
-  // Set CORS headers
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  // Set CORS headers for all responses
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
+    res.status(200).end();
     return;
   }
   
   next();
 });
 
-// We don't need the cors() middleware since we're handling CORS manually above
-// But we'll keep it for additional security
+// We still include the cors middleware for additional compatibility
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -73,8 +73,9 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+  optionsSuccessStatus: 200
 }));
+
 app.use(express.json());
 
 // Use returns router (moved after middleware)

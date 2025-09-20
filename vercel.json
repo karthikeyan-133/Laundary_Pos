@@ -19,7 +19,12 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend-new/server.js"
+      "dest": "backend-new/server.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+      }
     },
     {
       "src": "/(.*)",
