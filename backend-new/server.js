@@ -27,24 +27,28 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 console.log('Server configured to run on port:', PORT);
 
-// Comprehensive CORS middleware - this should be the first middleware
-app.use(cors({
+// Enhanced CORS configuration to handle all origins properly
+const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // Allow localhost for development
-    if (origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1) {
+    // List of allowed origins
+    const allowedOrigins = [
+      'http://localhost:8080',     // Your local development server
+      'http://localhost:3000',     // Common React dev server
+      'http://localhost:3004',     // Backend dev server
+      'http://127.0.0.1:8080',     // Alternative localhost
+      'https://pos-laundry-tau.vercel.app',  // Your frontend deployment
+      'https://pos-laundry-backend.vercel.app' // Your backend deployment
+    ];
+    
+    // Check if origin is in allowed list or is a Vercel app
+    if (allowedOrigins.includes(origin) || origin.includes('.vercel.app')) {
       return callback(null, true);
     }
     
-    // Allow Vercel deployments - specifically allow the frontend domain
-    if (origin === 'https://pos-laundry-tau.vercel.app' || 
-        origin.indexOf('.vercel.app') !== -1) {
-      return callback(null, true);
-    }
-    
-    // Allow any other origin in development
+    // Allow any origin in development environment
     if (process.env.NODE_ENV !== 'production') {
       console.log('Allowing origin in development:', origin);
       return callback(null, true);
@@ -56,14 +60,19 @@ app.use(cors({
   },
   credentials: true,
   optionsSuccessStatus: 200
-}));
+};
 
-// Additional explicit CORS headers middleware
+// Apply CORS middleware with our options
+app.use(cors(corsOptions));
+
+// Additional explicit CORS headers middleware for all responses
 app.use((req, res, next) => {
-  // Set CORS headers for all responses
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Set CORS headers - use dynamic origin if available, otherwise *
+  const origin = req.get('Origin');
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400');
   
   // Handle preflight requests immediately
@@ -77,9 +86,11 @@ app.use((req, res, next) => {
 
 // Explicitly handle all OPTIONS requests
 app.options('*', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.get('Origin');
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400');
   res.status(200).end();
 });
