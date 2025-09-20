@@ -27,47 +27,25 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 console.log('Server configured to run on port:', PORT);
 
-// Configure CORS properly to handle credentials
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow localhost for development
-    if (origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1) {
-      return callback(null, true);
-    }
-    
-    // Allow Vercel deployments - specifically allow the frontend domain
-    if (origin === 'https://pos-laundry-tau.vercel.app' || 
-        origin.indexOf('.vercel.app') !== -1) {
-      return callback(null, true);
-    }
-    
-    // Allow any other origin in development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Allowing origin in development:', origin);
-      return callback(null, true);
-    }
-    
-    // Block unknown origins in production
-    console.log('Blocking origin:', origin);
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
-
-// Handle preflight requests explicitly
-app.options('*', (req, res) => {
+// Simplified CORS configuration for Vercel
+app.use((req, res, next) => {
+  // Set CORS headers for all requests
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Max-Age', '86400');
-  res.sendStatus(200);
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
 });
 
-// Remove the previous middleware that was setting wildcard CORS headers
-// The cors middleware above will handle all CORS headers properly
+// Remove the previous complex CORS middleware
+// The simple middleware above will handle all CORS headers properly
 
 app.use(express.json());
 
@@ -81,6 +59,17 @@ app.get('/', (req, res) => {
     message: 'Tally POS API with MySQL',
     timestamp: new Date().toISOString(),
     status: 'healthy'
+  });
+});
+
+// Add a test CORS endpoint
+app.get('/test-cors', (req, res) => {
+  console.log('Test CORS endpoint called');
+  console.log('Origin:', req.get('Origin'));
+  res.json({ 
+    message: 'CORS test successful',
+    origin: req.get('Origin'),
+    headers: req.headers
   });
 });
 
