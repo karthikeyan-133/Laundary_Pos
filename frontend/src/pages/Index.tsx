@@ -75,7 +75,8 @@ const Index = () => {
     error,
     reloadOrders, // Add reloadOrders function
     returns, // Add returns data
-    clearReturns // Add clearReturns function
+    clearReturns, // Add clearReturns function
+    processReturn // Add processReturn function
   } = usePOSStore();
 
   const totals = calculateTotals();
@@ -126,10 +127,58 @@ const Index = () => {
 
   const handleReturnOrder = (order: Order, type: 'complete' | 'partial' | null = null) => {
     console.log('handleReturnOrder called with order:', order, 'and type:', type);
+    
+    // For complete return, process it directly
+    if (type === 'complete') {
+      processCompleteReturn(order);
+      return;
+    }
+    
+    // For partial return or null, navigate to return bills section
     setSelectedOrderForReturn(order);
     setReturnType(type);
-    setActiveView('return-bills'); // Changed from 'return-items' to 'return-bills'
+    setActiveView('return-bills');
     console.log('State updated: selectedOrderForReturn set and activeView set to return-bills');
+  };
+
+  // Process complete return directly
+  const processCompleteReturn = async (order: Order) => {
+    if (!order.items || !Array.isArray(order.items)) {
+      alert('No items found in this order');
+      return;
+    }
+    
+    // Prepare items for complete return (all items with full quantity)
+    const itemsToReturn = order.items.map(item => ({
+      product: {
+        ...item.product,
+        id: item.product.id || `unknown-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: item.product.name || 'Unknown Product',
+        ironRate: item.product.ironRate || 0,
+        washAndIronRate: item.product.washAndIronRate || 0,
+        dryCleanRate: item.product.dryCleanRate || 0,
+        barcode: item.product.barcode || '',
+        category: item.product.category || 'Unknown',
+        description: item.product.description || ''
+      },
+      quantity: item.quantity,
+      discount: item.discount,
+      service: item.service || 'iron'
+    }));
+    
+    // Process the return using the store function
+    const result = await processReturn(order.id, itemsToReturn, 'Complete Return');
+    
+    if (result) {
+      // Show success message
+      alert('Complete return processed successfully!');
+      
+      // Refresh data
+      await reloadOrders();
+    } else {
+      // Error handling is done in processReturn function
+      console.log('Failed to process complete return');
+    }
   };
 
   // Callback function for when a return is processed successfully
@@ -262,7 +311,12 @@ const Index = () => {
                 <Button 
                   variant={activeView === 'return-bills' ? "default" : "ghost"} // Simplified condition
                   className="flex items-center gap-2"
-                  onClick={() => setActiveView('return-bills')}
+                  onClick={() => {
+                    // Only allow access to return-bills view through Reports section
+                    // This button should not directly navigate to return-bills
+                    console.log('Return button clicked - should only navigate through Reports section');
+                  }}
+                  disabled={true} // Disable direct access to return-bills view
                 >
                   <RotateCcw className="h-4 w-4" />
                   Return
@@ -361,7 +415,7 @@ const Index = () => {
               onUpdateOrderPaymentStatus={updateOrderPaymentStatus}
               onUpdateOrderDeliveryStatus={updateOrderDeliveryStatus}
               currency={settings.currency}
-              onReturnOrder={handleReturnOrder}
+              onReturnOrder={(order, type) => handleReturnOrder(order, type)} // Pass the type parameter
               onReloadOrders={reloadOrders}
             />
           </div>
@@ -369,14 +423,6 @@ const Index = () => {
 
         {activeView === 'return-bills' && (
           <div className="mt-6">
-            <div className="flex gap-4 mb-4">
-              <Button 
-                variant={activeView === 'return-bills' ? "default" : "outline"}
-                onClick={() => setActiveView('return-bills')}
-              >
-                Return by Bills
-              </Button>
-            </div>
             <ReturnByBills onReturnProcessed={handleReturnProcessed} onViewReceipt={handleViewReceipt} onPrintReceipt={handlePrintReceipt} />
           </div>
         )}

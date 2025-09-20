@@ -21,7 +21,7 @@ interface HomeDeliveryProps {
   onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: 'paid' | 'unpaid', paymentMethod?: Order['paymentMethod']) => Promise<void>;
   onUpdateOrderDeliveryStatus: (orderId: string, deliveryStatus: 'pending' | 'in-transit' | 'delivered') => Promise<void>;
   currency: string;
-  onReturnOrder: (order: Order) => void;
+  onReturnOrder: (order: Order, type: 'complete' | 'partial' | null) => void; // Modified this line
   onReloadOrders: () => Promise<void>; // Add this prop to reload orders
 }
 
@@ -106,7 +106,7 @@ export function HomeDelivery({
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => onReturnOrder(order)}
+                        onClick={() => onReturnOrder(order, null)} // Pass null as the return type
                       >
                         <RotateCw className="h-4 w-4 mr-1" />
                         Return

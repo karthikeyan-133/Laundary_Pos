@@ -19,6 +19,7 @@ import {
 import { Order, Product, POSSettings } from '@/types/pos';
 import { BillingDetails } from './BillingDetails';
 import jsPDF from 'jspdf';
+// @ts-ignore
 import autoTable from 'jspdf-autotable';
 
 interface ReportsProps {
@@ -220,6 +221,39 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
     setReturnType(null);
   };
 
+  // Process complete return directly
+  const processCompleteReturn = async (order: Order) => {
+    if (!order.items || !Array.isArray(order.items)) {
+      alert('No items found in this order');
+      return;
+    }
+    
+    // Prepare items for complete return (all items with full quantity)
+    const itemsToReturn = order.items.map(item => ({
+      product: {
+        ...item.product,
+        id: item.product.id || `unknown-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: item.product.name || 'Unknown Product',
+        ironRate: item.product.ironRate || 0,
+        washAndIronRate: item.product.washAndIronRate || 0,
+        dryCleanRate: item.product.dryCleanRate || 0,
+        barcode: item.product.barcode || '',
+        category: item.product.category || 'Unknown',
+        description: item.product.description || ''
+      },
+      quantity: item.quantity,
+      discount: item.discount,
+      service: item.service || 'iron'
+    }));
+    
+    // Since we don't have access to processReturn function directly in this component,
+    // we'll pass the complete return data to the parent component
+    if (onReturnOrder) {
+      // We'll use a special return type to indicate complete return
+      onReturnOrder(order, 'complete');
+    }
+  };
+
   // Handle return option selection
   const handleReturnOptionSelect = (type: 'complete' | 'partial') => {
     setReturnType(type);
@@ -227,7 +261,15 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
     // If onReturnOrder is defined, call it with the order and return type
     if (onReturnOrder && selectedOrder) {
       console.log('Calling onReturnOrder with order:', selectedOrder, 'and type:', type);
-      onReturnOrder(selectedOrder, type);
+      // For complete return, we process it directly
+      // For partial return, we navigate to the return bills section
+      if (type === 'complete') {
+        // Process complete return directly
+        processCompleteReturn(selectedOrder);
+      } else {
+        // Navigate to return bills section for partial return
+        onReturnOrder(selectedOrder, type);
+      }
     }
     
     // Close the return options dialog

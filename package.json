@@ -19,6 +19,10 @@
   "author": "Tally POS Team",
   "license": "MIT",
   "dependencies": {
-    "concurrently": "^8.0.0"
+    "concurrently": "^8.0.0",
+    "jspdf-autotable": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/jspdf": "^2.0.0"
   }
 }

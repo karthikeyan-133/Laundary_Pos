@@ -28,27 +28,14 @@ const getServiceRate = (product: any, service: 'iron' | 'washAndIron' | 'dryClea
   }
 };
 
-interface ReturnRecord {
-  date: string;
-  time: string;
-  orderId: string;
-  productCode: string;
-  productName: string;
-  quantity: number;
-  price: number;
-  subtotal: number;
-  status: string;
-}
-
 interface ReturnByBillsProps {
-  returns?: any[];
   onReturnProcessed?: (orderId: string, items: Record<string, number>, reason: string) => void;
   onViewReceipt?: (order: Order) => void;
   onPrintReceipt?: (order: Order) => void;
 }
 
 export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt }: ReturnByBillsProps) {
-  const { orders, processReturn, settings, returns, fetchReturns, refreshData, reloadOrders } = usePOSStore();
+  const { orders, processReturn, settings, fetchReturns, refreshData, reloadOrders } = usePOSStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
@@ -279,11 +266,13 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
       
       // For complete return, directly process the return without showing item selection
       setReturnReason('Complete Return');
-      // Instead of automatically processing, let the user click the Process Return button
-      // setTimeout(() => {
-      //   handleProcessReturn();
-      // }, 100);
+      // Automatically process the complete return
+      setTimeout(() => {
+        handleProcessReturn();
+      }, 100);
     }
+    // For partial return, we'll show the item selection screen
+    // The UI will automatically update based on the returnType state
   };
 
   // Generate receipt for return
@@ -439,130 +428,6 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
     }
   };
 
-  // Format return records from backend data
-  const formatReturnRecords = () => {
-    // First, deduplicate the returns by ID
-    const uniqueReturns = returns.filter((returnRecord, index, self) => 
-      index === self.findIndex(r => r.id === returnRecord.id)
-    );
-    
-    const formattedRecords: any[] = [];
-    
-    // Group return items by order ID to avoid duplication
-    const returnsByOrder: Record<string, any[]> = {};
-    
-    uniqueReturns.forEach(returnRecord => {
-      const orderId = returnRecord.order_id;
-      if (!returnsByOrder[orderId]) {
-        returnsByOrder[orderId] = [];
-      }
-      returnsByOrder[orderId].push(returnRecord);
-    });
-    
-    // Process each order's returns
-    Object.entries(returnsByOrder).forEach(([orderId, orderReturns]) => {
-      // Use the most recent return record for this order
-      const latestReturn = orderReturns.reduce((latest, current) => {
-        return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-      });
-      
-      // Get the order for this return
-      const order = orders.find(o => o.id === orderId);
-      
-      // Format date and time properly
-      const createdAt = new Date(latestReturn.created_at);
-      // Adjust for Dubai time (UTC+4)
-      const dubaiTime = new Date(createdAt.getTime() + (4 * 60 * 60 * 1000));
-      const dateStr = dubaiTime.toLocaleDateString('en-US', { 
-        timeZone: 'Asia/Dubai',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-      const timeStr = dubaiTime.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true,
-        timeZone: 'Asia/Dubai'
-      });
-      
-      // Process return items and group them by order
-      const items = latestReturn.return_items || [];
-      
-      // Calculate totals for the entire return
-      let totalQuantity = 0;
-      let totalRefund = 0;
-      let itemDetails: string[] = [];
-      
-      items.forEach((item: any) => {
-        const quantity = item.quantity || 0;
-        // Use refund_amount directly from the item, with proper fallback
-        const refund = item.refund_amount !== undefined && item.refund_amount !== null ? 
-          (typeof item.refund_amount === 'string' ? parseFloat(item.refund_amount) : item.refund_amount) : 0;
-        
-        totalQuantity += quantity;
-        totalRefund += refund;
-        
-        // Get product name with fallbacks
-        const productName = item.product_name || item.barcode || 'Unknown Product';
-        itemDetails.push(`${productName} (${quantity})`);
-      });
-      
-      // Calculate average price
-      const avgPrice = totalQuantity > 0 ? totalRefund / totalQuantity : 0;
-      
-      // Create a single record per order
-      formattedRecords.push({
-        id: latestReturn.id,
-        date: dateStr,
-        time: timeStr,
-        orderId: orderId.slice(-6),
-        productName: itemDetails.join(', '),
-        quantity: totalQuantity,
-        price: avgPrice,
-        subtotal: totalRefund, // This should be a number
-        status: 'completed',
-        returnId: latestReturn.id,
-        orderIdFull: orderId
-      });
-    });
-    
-    // Apply date filtering to return records
-    if (fromDate || toDate) {
-      return formattedRecords.filter(record => {
-        try {
-          // Parse the formatted date string back to a Date object
-          const recordDate = new Date(record.date);
-          const from = fromDate ? new Date(fromDate) : null;
-          const to = toDate ? new Date(toDate) : null;
-          
-          // Set time to start of day for fromDate comparison
-          if (from) {
-            from.setHours(0, 0, 0, 0);
-          }
-          
-          // Set time to end of day for toDate comparison
-          if (to) {
-            to.setHours(23, 59, 59, 999);
-          }
-          
-          const result = (
-            (!from || recordDate >= from) &&
-            (!to || recordDate <= to)
-          );
-          
-          return result;
-        } catch (err) {
-          console.error('Error filtering return record by date:', record, err);
-          return false;
-        }
-      });
-    }
-    
-    return formattedRecords;
-  };
-
-  const returnRecords = formatReturnRecords();
 
   return (
     <div className="space-y-6">
@@ -871,92 +736,6 @@ export function ReturnByBills({ onReturnProcessed, onViewReceipt, onPrintReceipt
           )}
         </CardContent>
       </Card>
-
-      {/* Return Records Section */}
-      {returnRecords.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RotateCcw className="h-5 w-5" />
-              Return Records
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => fetchReturns()}
-                className="ml-auto"
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Avg Price</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {returnRecords.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>{record.date}</TableCell>
-                    <TableCell>{record.time}</TableCell>
-                    <TableCell>{record.orderId}</TableCell>
-                    <TableCell>{record.productName}</TableCell>
-                    <TableCell>{record.quantity}</TableCell>
-                    <TableCell>{settings?.currency} {Number(record.price).toFixed(2)}</TableCell>
-                    <TableCell>{settings?.currency} {Number(record.subtotal).toFixed(2)}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                        {record.status}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            const order = orders.find(o => o.id === record.orderIdFull);
-                            if (order && onPrintReceipt) {
-                              onPrintReceipt(order);
-                            }
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            const order = orders.find(o => o.id === record.orderIdFull);
-                            if (order && onViewReceipt) {
-                              onViewReceipt(order);
-                            }
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
