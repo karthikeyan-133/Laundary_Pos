@@ -5,14 +5,16 @@
 </head>
 <body>
     <h1>CORS Test</h1>
-    <button onclick="testCORS()">Test CORS Request</button>
+    <button id="testButton">Test API Connection</button>
     <div id="result"></div>
 
     <script>
-        async function testCORS() {
+        document.getElementById('testButton').addEventListener('click', async () => {
             const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
             try {
-                const response = await fetch('http://localhost:3001/test', {
+                const response = await fetch('http://localhost:3004/api/products', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json'
@@ -21,15 +23,16 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    resultDiv.innerHTML = '<p style="color: green;">Success: ' + JSON.stringify(data) + '</p>';
+                    resultDiv.innerHTML = `<p style="color: green;">Success! Retrieved ${data.length} products.</p>`;
+                    console.log('Data:', data);
                 } else {
-                    resultDiv.innerHTML = '<p style="color: red;">Error: ' + response.status + ' ' + response.statusText + '</p>';
+                    resultDiv.innerHTML = `<p style="color: red;">Error: ${response.status} ${response.statusText}</p>`;
                 }
             } catch (error) {
-                resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
-                console.error('CORS Error:', error);
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Error:', error);
             }
-        }
+        });
     </script>
 </body>
 </html>
