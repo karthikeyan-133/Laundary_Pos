@@ -3,7 +3,8 @@
 const getApiBaseUrl = () => {
   // Check for environment variable first
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    // Remove trailing slash to prevent double slashes
+    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
   }
   
   // For Vercel deployments, API is at the same domain
@@ -27,8 +28,9 @@ console.log('API base URL:', API_BASE_URL);
 
 // Helper function for API requests
 export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  // Ensure endpoint starts with /api
-  const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+  // Ensure endpoint starts with /api and doesn't have double slashes
+  let normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+  normalizedEndpoint = normalizedEndpoint.replace(/\/+/g, '/'); // Replace multiple slashes with single slash
   const url = `${API_BASE_URL}${normalizedEndpoint}`;
   
   console.log(`Making API request to: ${url}`, options);

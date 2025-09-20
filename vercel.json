@@ -16,23 +16,23 @@
   "routes": [
     {
       "src": "/api/test",
-      "dest": "backend-new/api/test/index.js"
+      "dest": "backend-new/server.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/api/health",
-      "dest": "backend-new/api/health.js"
+      "dest": "backend-new/server.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/api/cors",
-      "dest": "backend-new/api/cors-handler.js"
-    },
-    {
-      "src": "/vercel-cors-test",
-      "dest": "vercel-cors-test.js"
+      "dest": "backend-new/server.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/api/(.*)",
-      "dest": "backend-new/server.js"
+      "dest": "backend-new/server.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/(.*)",

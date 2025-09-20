@@ -5,25 +5,43 @@
 </head>
 <body>
     <h1>CORS Test Page</h1>
-    <button id="testButton">Test CORS</button>
+    <button id="testButton">Test API Connection</button>
     <div id="result"></div>
 
     <script>
         document.getElementById('testButton').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
             try {
-                const response = await fetch('https://pos-laundry-backend.vercel.app/api/test', {
+                // Determine API base URL
+                let apiUrl;
+                if (window.location.hostname.includes('vercel.app')) {
+                    // For Vercel deployments, use the backend URL
+                    apiUrl = 'https://pos-laundry-backend.vercel.app';
+                } else {
+                    // For local development
+                    apiUrl = 'http://localhost:3004';
+                }
+                
+                console.log('Testing API at:', apiUrl);
+                
+                const response = await fetch(`${apiUrl}/api/test`, {
                     method: 'GET',
-                    credentials: 'include'
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 });
                 
                 if (response.ok) {
                     const data = await response.json();
-                    document.getElementById('result').innerHTML = '<p style="color: green;">Success: ' + JSON.stringify(data) + '</p>';
+                    resultDiv.innerHTML = `<p style="color: green;">Success: ${JSON.stringify(data)}</p>`;
                 } else {
-                    document.getElementById('result').innerHTML = '<p style="color: red;">Error: ' + response.status + ' ' + response.statusText + '</p>';
+                    resultDiv.innerHTML = `<p style="color: red;">Error: ${response.status} ${response.statusText}</p>`;
                 }
             } catch (error) {
-                document.getElementById('result').innerHTML = '<p style="color: red;">Network Error: ' + error.message + '</p>';
+                console.error('Test failed:', error);
+                resultDiv.innerHTML = `<p style="color: red;">Failed: ${error.message}</p>`;
             }
         });
     </script>
