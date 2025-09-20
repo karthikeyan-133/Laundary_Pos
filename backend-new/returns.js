@@ -5,8 +5,6 @@ const router = express.Router();
 
 console.log('Returns router initialized');
 
-
-
 // Create a return record
 router.post('/', async (req, res) => {
   console.log('POST /api/returns called with body:', req.body);
@@ -111,6 +109,8 @@ router.post('/', async (req, res) => {
       return res.status(500).json({ error: 'Failed to update order status: ' + err.message });
     }
     
+    // Ensure CORS headers are set
+    res.header('Access-Control-Allow-Origin', '*');
     res.status(201).json(returnData);
   } catch (err) {
     console.error('Error processing return:', err);
@@ -186,6 +186,8 @@ router.get('/', async (req, res) => {
     }));
     
     console.log('Returns fetched:', returnsWithItems);
+    // Ensure CORS headers are set
+    res.header('Access-Control-Allow-Origin', '*');
     res.json(returnsWithItems);
   } catch (err) {
     console.error('Error fetching returns:', err);
@@ -206,6 +208,8 @@ router.delete('/clear', async (req, res) => {
     const returnsResult = await db.query('DELETE FROM returns');
     
     console.log('All returns cleared successfully');
+    // Ensure CORS headers are set
+    res.header('Access-Control-Allow-Origin', '*');
     res.json({ message: 'All returns cleared successfully' });
   } catch (err) {
     console.error('Error clearing returns:', err);
