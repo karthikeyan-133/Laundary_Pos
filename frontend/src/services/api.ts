@@ -34,14 +34,17 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
   
   console.log(`Making API request to: ${url}`, options);
   
+  // Add credentials to requests for CORS
   const config: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
     // Add timeout to prevent hanging requests
-    signal: AbortSignal.timeout(10000), // 10 second timeout
+    signal: AbortSignal.timeout(15000), // 15 second timeout
     ...options,
+    // Ensure credentials are included for CORS requests
+    credentials: 'include'
   };
 
   try {
@@ -79,7 +82,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     if (error.name === 'AbortError') {
       throw new Error('Request timeout. Please try again.');
     } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      throw new Error('Network error. Please check your connection and try again.');
+      throw new Error('Network error. Please check your connection and try again. If this persists, the server may be unreachable.');
     }
     throw error;
   }

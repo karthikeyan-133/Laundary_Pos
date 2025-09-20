@@ -28,23 +28,6 @@ const PORT = process.env.PORT || 3004;
 console.log('Server configured to run on port:', PORT);
 
 // Comprehensive CORS middleware - this should be the first middleware
-app.use((req, res, next) => {
-  // Set CORS headers for all responses
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  
-  // Handle preflight requests immediately
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  
-  next();
-});
-
-// Additional CORS middleware for compatibility
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -74,6 +57,23 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 200
 }));
+
+// Additional explicit CORS headers middleware
+app.use((req, res, next) => {
+  // Set CORS headers for all responses
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  
+  // Handle preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+});
 
 // Explicitly handle all OPTIONS requests
 app.options('*', (req, res) => {
