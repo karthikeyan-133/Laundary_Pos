@@ -1,5 +1,5 @@
 module.exports = (req, res) => {
-  // Set CORS headers for all requests
+  // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
@@ -12,5 +12,10 @@ module.exports = (req, res) => {
   }
   
   // For all other requests, return a simple response
-  res.json({ message: 'CORS handler working' });
+  res.json({ 
+    message: 'CORS test endpoint working',
+    method: req.method,
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
 };

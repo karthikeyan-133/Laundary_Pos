@@ -27,7 +27,7 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 console.log('Server configured to run on port:', PORT);
 
-// ✅ Enable CORS for your frontend
+// ✅ Enable CORS for your frontend - Updated for Vercel deployment
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -60,10 +60,27 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+// Apply CORS middleware to all routes
 app.use(cors(corsOptions));
 
-// ✅ Allow preflight requests
+// Also apply CORS to all OPTIONS requests specifically
 app.options('*', cors(corsOptions));
+
+// Add explicit CORS headers middleware for Vercel
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Max-Age', '86400');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
+});
 
 // Add a test CORS endpoint
 app.get("/api/test", (req, res) => {

@@ -10,20 +10,25 @@
     },
     {
       "src": "backend-new/server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": "backend-new/**"
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [
+    {
+      "src": "/api/test",
+      "dest": "backend-new/api/test/index.js"
+    },
+    {
+      "src": "/api/health",
+      "dest": "backend-new/api/health.js"
+    },
     {
       "src": "/api/(.*)",
       "dest": "backend-new/server.js"
     },
     {
       "src": "/(.*)",
-      "dest": "dist/$1"
+      "dest": "frontend/dist/$1"
     }
   ]
 }
