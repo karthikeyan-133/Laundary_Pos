@@ -21,15 +21,15 @@
   - `https://pos-laundry-ajish.vercel.app` (previous domain)
   - `https://pos-laundry-eight.vercel.app` (current domain)
   - `https://pos-laundry-tau.vercel.app` (production domain)
-- Improved CORS header handling to dynamically use the request origin
+- Simplified CORS configuration to avoid conflicts
+- Removed conflicting separate CORS handler
 - Ensured all API endpoints properly set CORS headers
-- Simplified CORS middleware to avoid conflicts
 
 ### 3. Vercel Configuration (`vercel.json`)
 
-- Updated routes to properly direct API requests to the backend
-- Added explicit method definitions for API routes
-- Simplified routing to prevent redirects
+- Simplified routes to properly direct all API requests to the backend
+- Removed specific route definitions that might cause conflicts
+- Ensured all `/api/*` routes are handled by the main server.js file
 
 ### 4. Environment Configuration (`frontend/.env`)
 

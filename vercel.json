@@ -15,24 +15,8 @@
   ],
   "routes": [
     {
-      "src": "/api/test",
-      "dest": "backend-new/server.js",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/health",
-      "dest": "backend-new/server.js",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/cors",
-      "dest": "backend-new/server.js",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
       "src": "/api/(.*)",
-      "dest": "backend-new/server.js",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      "dest": "backend-new/server.js"
     },
     {
       "src": "/(.*)",

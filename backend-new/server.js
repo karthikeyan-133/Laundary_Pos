@@ -65,58 +65,17 @@ const corsOptions = {
 // Apply CORS middleware to all routes
 app.use(cors(corsOptions));
 
-// Add a middleware that sets CORS headers on every response
+// Simple middleware to ensure CORS headers are set
 app.use((req, res, next) => {
-  // Get origin from request
-  const origin = req.get('Origin');
-  
-  // Set CORS headers on every response
-  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Max-Age', '86400');
-    res.status(200).end();
-    return;
-  }
-  
-  // Override the default json method to ensure CORS headers are set
-  const originalJson = res.json;
-  res.json = function(data) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    return originalJson.call(this, data);
-  };
-  
   next();
-});
-
-// Handle all OPTIONS requests explicitly
-app.options('*', (req, res) => {
-  const origin = req.get('Origin');
-  res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Max-Age', '86400');
-  res.status(200).end();
-});
-
-// Add a test CORS endpoint
-app.get("/api/test", (req, res) => {
-  res.json({ message: "CORS working 🚀" });
 });
 
 app.use(express.json());
 
-// Use returns router (moved after middleware)
+// Use returns router
 app.use('/api/returns', returnsRouter);
 console.log('Returns router mounted at /api/returns');
 
@@ -185,8 +144,6 @@ app.get('/api/products', async (req, res) => {
       dryCleanRate: parseFloat(product.dryCleanRate) || 0
     }));
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.json(transformedData);
   } catch (err) {
     console.error('Error fetching products:', err);
@@ -212,8 +169,6 @@ app.get('/api/products/:id', async (req, res) => {
       dryCleanRate: parseFloat(data[0].dryCleanRate) || 0
     };
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.json(transformedData);
   } catch (err) {
     console.error('Error fetching product:', err);
@@ -296,8 +251,6 @@ app.post('/api/products', async (req, res) => {
       }
     });
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.status(201).json(responseData);
   } catch (err) {
     console.error('Unexpected error in product creation:', err);
@@ -340,8 +293,6 @@ app.put('/api/products/:id', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.json(data[0]);
   } catch (err) {
     console.error('Error updating product:', err);
@@ -387,8 +338,6 @@ app.delete('/api/products/:id', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.status(204).send();
   } catch (err) {
     console.error('Error deleting product:', err);
@@ -400,8 +349,6 @@ app.delete('/api/products/:id', async (req, res) => {
 app.get('/api/customers', async (req, res) => {
   try {
     const data = await db.query('SELECT * FROM customers');
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.json(data);
   } catch (err) {
     console.error('Error fetching customers:', err);
@@ -419,8 +366,6 @@ app.get('/api/customers/:id', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.json(data[0]);
   } catch (err) {
     console.error('Error fetching customer:', err);
@@ -451,8 +396,6 @@ app.post('/api/customers', async (req, res) => {
     // Fetch created customer
     const data = await db.query('SELECT * FROM customers WHERE id = ?', [id]);
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.status(201).json(data[0]);
   } catch (err) {
     console.error('Error creating customer:', err);
@@ -483,8 +426,6 @@ app.get('/api/orders', async (req, res) => {
       return { ...order, items };
     }));
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.json(ordersWithItems);
   } catch (err) {
     console.error('Error fetching orders:', err);
@@ -523,8 +464,6 @@ app.get('/api/orders/:id', async (req, res) => {
       items: items
     };
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.json(orderWithItems);
   } catch (err) {
     console.error('Error fetching order:', err);
