@@ -44,7 +44,8 @@ const corsOptions = {
       'http://127.0.0.1:8080',     // Alternative localhost for port 8080
       'http://127.0.0.1:8081',     // Alternative localhost for port 8081
       'https://pos-laundry-tau.vercel.app',  // Production frontend
-      'https://billing-pos-yjh9.vercel.app'   // Another possible frontend
+      'https://billing-pos-yjh9.vercel.app',   // Another possible frontend
+      'https://pos-laundry-backend.vercel.app'   // Current backend URL
     ];
     
     // Check if the origin is in our allowed list

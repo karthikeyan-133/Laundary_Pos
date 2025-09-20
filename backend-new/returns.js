@@ -5,22 +5,7 @@ const router = express.Router();
 
 console.log('Returns router initialized');
 
-// Simplified CORS configuration for returns router
-router.use((req, res, next) => {
-  // Set CORS headers for all requests
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Max-Age', '86400');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-  
-  next();
-});
+
 
 // Create a return record
 router.post('/', async (req, res) => {

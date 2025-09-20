@@ -13,22 +13,31 @@ This document summarizes the changes made to fix the connection issues between t
   - `http://127.0.0.1:5174` (Alternative localhost)
   - `https://pos-laundry-tau.vercel.app` (Production frontend)
   - `https://billing-pos-yjh9.vercel.app` (Alternative frontend)
+  - `https://pos-laundry-backend.vercel.app` (Current backend URL)
 
 ### 2. Frontend Environment Configuration (frontend/.env)
 - Added `VITE_API_URL=http://localhost:3004` to connect to the backend server
 
 ### 3. Frontend API Service (frontend/src/services/api.ts)
 - Updated the API base URL detection to use the correct backend URL
+- Updated to use `https://pos-laundry-backend.vercel.app` for Vercel deployments
 
-### 4. Project Documentation
+### 4. Returns Router CORS Configuration (backend-new/returns.js)
+- Removed conflicting CORS middleware that was causing issues with the main server CORS setup
+
+### 5. Vercel Configuration (vercel.json)
+- Removed unnecessary routes that were causing routing conflicts
+
+### 6. Project Documentation
 - Created comprehensive README.md files for both frontend and backend
 - Added root README.md with setup instructions
 - Created test scripts to verify connections
 
-### 5. Development Scripts
+### 7. Development Scripts
 - Created package.json in root directory with scripts to run both frontend and backend simultaneously
 - Added test scripts to verify connections
 - Added individual scripts to run frontend or backend separately
+- Added deployment scripts for easier Vercel deployment
 
 ## Testing the Connection
 
@@ -56,6 +65,8 @@ npm test
    - Ensure the backend CORS configuration allows your frontend origin
    - Check that both servers are running
    - Verify the `VITE_API_URL` in the frontend `.env` file matches the backend URL
+   - Make sure the returns router doesn't have conflicting CORS configuration
+   - Check that the vercel.json routing configuration is correct
 
 2. **Database Connection Issues**
    - Verify your MySQL database is running
