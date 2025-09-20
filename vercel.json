@@ -18,8 +18,8 @@
   ],
   "routes": [
     {
-      "src": "/api/cors",
-      "dest": "backend-new/api/cors.js"
+      "src": "/api/test",
+      "dest": "backend-new/test-cors.js"
     },
     {
       "src": "/api/(.*)",

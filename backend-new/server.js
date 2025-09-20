@@ -27,25 +27,22 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 console.log('Server configured to run on port:', PORT);
 
-// Simplified CORS configuration for Vercel
-app.use((req, res, next) => {
-  // Set CORS headers for all requests
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Max-Age', '86400');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-  
-  next();
-});
+// Allow your frontend domain with a simpler CORS configuration
+app.use(
+  cors({
+    origin: "https://pos-laundry-tau.vercel.app", // your frontend URL
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
 
-// Remove the previous complex CORS middleware
-// The simple middleware above will handle all CORS headers properly
+// Handle preflight requests explicitly
+app.options('*', cors());
+
+// Add a test CORS endpoint
+app.get("/api/test", (req, res) => {
+  res.json({ message: "CORS is working!" });
+});
 
 app.use(express.json());
 

@@ -1,7 +1,24 @@
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
 
 const app = express();
+
+// Allow your frontend domain
+app.use(
+  cors({
+    origin: "https://pos-laundry-tau.vercel.app", // your frontend URL
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
+
+// Example test route
+app.get("/api/test", (req, res) => {
+  res.json({ message: "CORS is working!" });
+});
+
+module.exports = app;
+
 const port = 3001;
 
 // CORS configuration
