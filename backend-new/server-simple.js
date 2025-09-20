@@ -18,14 +18,11 @@ const db = require('./mysqlDb');
 // Import returns router
 const returnsRouter = require('./returns');
 
-console.log('Returns router loaded:', !!returnsRouter);
-
 const app = express();
 
 // Use Vercel's PORT or default to 3004 for local development (changed from 3003 to avoid conflicts)
 // Vercel dynamically assigns a PORT through process.env.PORT
 const PORT = process.env.PORT || 3004;
-console.log('Server configured to run on port:', PORT);
 
 // ✅ Enable CORS for your frontend
 const corsOptions = {
@@ -44,7 +41,7 @@ const corsOptions = {
       'http://127.0.0.1:8080',     // Alternative localhost for port 8080
       'http://127.0.0.1:8081',     // Alternative localhost for port 8081
       'https://pos-laundry-tau.vercel.app',  // Production frontend
-      'https://billing-pos-yjh9.vercel.app',   // Another possible frontend
+         // Another possible frontend
       'https://pos-laundry-backend.vercel.app'   // Current backend URL
     ];
     
@@ -65,35 +62,17 @@ app.use(cors(corsOptions));
 // ✅ Allow preflight requests
 app.options('*', cors(corsOptions));
 
-// Add a test CORS endpoint
-app.get("/api/test", (req, res) => {
-  res.json({ message: "CORS working 🚀" });
-});
-
+// ✅ Parse JSON
 app.use(express.json());
 
 // Use returns router (moved after middleware)
 app.use('/api/returns', returnsRouter);
-console.log('Returns router mounted at /api/returns');
 
-// Routes
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Tally POS API with MySQL',
-    timestamp: new Date().toISOString(),
-    status: 'healthy'
-  });
-});
+// --- Routes ---
 
-// Add a test CORS endpoint
-app.get('/test-cors', (req, res) => {
-  console.log('Test CORS endpoint called');
-  console.log('Origin:', req.get('Origin'));
-  res.json({ 
-    message: 'CORS test successful',
-    origin: req.get('Origin'),
-    headers: req.headers
-  });
+// ✅ Add test endpoint
+app.get("/api/test", (req, res) => {
+  res.json({ message: "CORS working 🚀" });
 });
 
 // ✅ Add CORS check endpoint
@@ -101,6 +80,7 @@ app.get("/api/cors-check", (req, res) => {
   res.json({ cors: "ok" });
 });
 
+// Health check endpoint
 app.get('/health', async (req, res) => {
   try {
     // Test MySQL connection
