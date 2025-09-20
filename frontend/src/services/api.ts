@@ -11,7 +11,9 @@ const getApiBaseUrl = () => {
     // In browser environment
     if (window.location.hostname.includes('vercel.app')) {
       // For Vercel deployments, API is at the same domain
-      return '';
+      // But we need to allow cross-domain requests for separate deployments
+      // Return the specific backend URL for Vercel deployments
+      return 'https://pos-laundry-backend.vercel.app';
     } else {
       // For local development
       return 'http://localhost:3000';

@@ -28,6 +28,24 @@ const PORT = process.env.PORT || 3003;
 console.log('Server configured to run on port:', PORT);
 
 // Middleware
+// Set CORS headers explicitly
+app.use((req, res, next) => {
+  // Set CORS headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
+});
+
+// We don't need the cors() middleware since we're handling CORS manually above
+// But we'll keep it for additional security
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -38,21 +56,24 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Allow Vercel deployments
-    if (origin.indexOf('.vercel.app') !== -1) {
+    // Allow Vercel deployments - specifically allow the frontend domain
+    if (origin === 'https://pos-laundry-tau.vercel.app' || 
+        origin.indexOf('.vercel.app') !== -1) {
       return callback(null, true);
     }
     
-    // Add your production domain here when you have one
-    // if (origin === 'https://your-production-domain.com') {
-    //   return callback(null, true);
-    // }
+    // Allow any other origin in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Allowing origin in development:', origin);
+      return callback(null, true);
+    }
     
-    // For now, allow all origins in development and production
-    console.log('Allowing origin:', origin);
-    return callback(null, true);
+    // Block unknown origins in production
+    console.log('Blocking origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 app.use(express.json());
 
