@@ -23,6 +23,14 @@
       "dest": "backend-new/api/health.js"
     },
     {
+      "src": "/api/cors",
+      "dest": "backend-new/api/cors-handler.js"
+    },
+    {
+      "src": "/vercel-cors-test",
+      "dest": "vercel-cors-test.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "backend-new/server.js"
     },

@@ -63,13 +63,10 @@ const corsOptions = {
 // Apply CORS middleware to all routes
 app.use(cors(corsOptions));
 
-// Add explicit CORS headers middleware for Vercel
+// Add a middleware that sets CORS headers on every response
 app.use((req, res, next) => {
-  // Get the origin from the request
-  const origin = req.get('Origin');
-  
-  // Set CORS headers
-  res.header('Access-Control-Allow-Origin', origin || '*');
+  // Set CORS headers on every response
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -77,23 +74,31 @@ app.use((req, res, next) => {
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Max-Age', '86400');
     res.status(200).end();
     return;
   }
+  
+  // Override the default json method to ensure CORS headers are set
+  const originalJson = res.json;
+  res.json = function(data) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    return originalJson.call(this, data);
+  };
   
   next();
 });
 
 // Handle all OPTIONS requests explicitly
 app.options('*', (req, res) => {
-  // Get the origin from the request
-  const origin = req.get('Origin');
-  
-  // Set CORS headers for preflight requests
-  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400');
   res.status(200).end();
 });
