@@ -27,17 +27,42 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 console.log('Server configured to run on port:', PORT);
 
-// Allow your frontend domain with a simpler CORS configuration
-app.use(
-  cors({
-    origin: "https://pos-laundry-tau.vercel.app", // your frontend URL
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
-  })
-);
+// Enhanced CORS configuration to support both local development and production
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      'http://localhost:5173',     // Default Vite development server
+      'http://localhost:5174',     // Alternative Vite development server
+      'http://localhost:8080',     // Another development server port
+      'http://localhost:8081',     // Another development server port
+      'http://127.0.0.1:5173',     // Alternative localhost
+      'http://127.0.0.1:5174',     // Alternative localhost
+      'http://127.0.0.1:8080',     // Alternative localhost for port 8080
+      'http://127.0.0.1:8081',     // Alternative localhost for port 8081
+      'https://pos-laundry-tau.vercel.app',  // Production frontend
+      'https://billing-pos-yjh9.vercel.app'   // Another possible frontend
+    ];
+    
+    // Check if the origin is in our allowed list
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 // Handle preflight requests explicitly
-app.options('*', cors());
+app.options('*', cors(corsOptions));
 
 // Add a test CORS endpoint
 app.get("/api/test", (req, res) => {

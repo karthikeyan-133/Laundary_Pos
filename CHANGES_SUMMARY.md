@@ -1,86 +1,121 @@
-# Changes Summary for Tally POS System
+# Tally POS System - Connection Fixes Summary
 
-## Database Schema Updates
+## Overview
+This document summarizes the changes made to fix the connection issues between the frontend and backend of the Tally POS system.
 
-1. **schema.sql** - Updated to remove stock and SKU columns, added service-specific rate columns
-2. **init_db.sql** - Updated to match new schema structure
-3. **create-tables.js** - Updated to match new schema structure
-4. **init-empty-db.js** - Updated to match new schema structure
-5. **init-supabase-db.js** - Updated documentation to match new schema structure
+## Changes Made
 
-## Backend API Updates
+### 1. Backend CORS Configuration (backend-new/server.js)
+- Updated CORS configuration to allow multiple origins including:
+  - `http://localhost:5173` (Default Vite development server)
+  - `http://localhost:5174` (Alternative Vite development server)
+  - `http://127.0.0.1:5173` (Alternative localhost)
+  - `http://127.0.0.1:5174` (Alternative localhost)
+  - `https://pos-laundry-tau.vercel.app` (Production frontend)
+  - `https://billing-pos-yjh9.vercel.app` (Alternative frontend)
 
-1. **server.js** - Updated product queries to fetch correct columns
-2. **supabaseDb.js** - No changes needed
-3. **supabaseClient.js** - No changes needed
+### 2. Frontend Environment Configuration (frontend/.env)
+- Added `VITE_API_URL=http://localhost:3004` to connect to the backend server
 
-## Frontend Component Updates
+### 3. Frontend API Service (frontend/src/services/api.ts)
+- Updated the API base URL detection to use the correct backend URL
 
-1. **ProductManagement.tsx** - Updated form to use service-specific rates instead of single price
-2. **ProductList.tsx** - Updated to search by barcode instead of SKU, display service rates
-3. **POSInvoice.tsx** - Updated barcode scanning to use barcode instead of SKU
-4. **ReturnRecords.tsx** - Updated to display barcode instead of SKU
-5. **HomeDelivery.tsx** - No changes needed (already updated)
-6. **Reports.tsx** - No changes needed (already updated)
-7. **ReturnByBills.tsx** - No changes needed (already updated)
-// Removed reference to ReturnByItems.tsx
+### 4. Project Documentation
+- Created comprehensive README.md files for both frontend and backend
+- Added root README.md with setup instructions
+- Created test scripts to verify connections
 
-## Frontend Hook Updates
+### 5. Development Scripts
+- Created package.json in root directory with scripts to run both frontend and backend simultaneously
+- Added test scripts to verify connections
+- Added individual scripts to run frontend or backend separately
 
-1. **usePOSStore.ts** - Fixed calculation logic for:
-   - Adding items to cart
-   - Updating item quantities
-   - Applying item discounts
-   - Calculating cart totals
-   - Removed all stock-related functionality
+## Testing the Connection
 
-## Type Definition Updates
+### Automated Testing
+Run the following command from the root directory to test the connection:
+```bash
+npm test
+```
 
-1. **pos.ts** - Updated Product type to remove stock and sku properties, added service-specific rate properties
+### Manual Testing
+1. Start both frontend and backend servers:
+   ```bash
+   npm start
+   ```
 
-## Utility Updates
+2. Open your browser and navigate to http://localhost:5173
 
-1. **api.ts** - Updated Product type to match new structure
-2. **barcodeSimulator.ts** - Updated to use barcode instead of SKU for sample products
+3. The frontend should be able to communicate with the backend and display data
 
-## Test Files Created
+## Troubleshooting
 
-1. **CalculationTest.tsx** - Component to test calculation logic
-2. **CalculationDebug.tsx** - Component to debug calculation issues
-3. **test-db-structure.js** - Script to test database structure
-4. **update-db-structure.js** - Script to identify required database changes
-5. **migrate-db.js** - Script to generate migration commands
-6. **supabase-migration.sql** - SQL migration script for Supabase
+### Common Issues and Solutions
 
-## Documentation Updates
+1. **CORS Errors**
+   - Ensure the backend CORS configuration allows your frontend origin
+   - Check that both servers are running
+   - Verify the `VITE_API_URL` in the frontend `.env` file matches the backend URL
 
-1. **SUPABASE_SETUP.md** - Updated to match new schema structure
-2. **FIX_INSTRUCTIONS.md** - Instructions to fix database issues
-3. **CHANGES_SUMMARY.md** - This file
+2. **Database Connection Issues**
+   - Verify your MySQL database is running
+   - Check the database credentials in the backend `.env` file
+   - Ensure the database schema has been created
 
-## Key Calculation Fixes
+3. **Port Conflicts**
+   - The backend runs on port 3004 by default
+   - The frontend runs on port 5173 by default
+   - If these ports are in use, the applications will try alternative ports
 
-1. **Fixed addToCart function** - Correctly calculates subtotal when adding items to cart
-2. **Fixed updateCartItemQuantity function** - Correctly recalculates subtotal when quantity changes
-3. **Fixed updateCartItemDiscount function** - Correctly applies discounts to item subtotals
-4. **Fixed calculateTotals function** - Correctly calculates cart-level totals with discounts and tax
+### Testing Scripts
 
-## Database Migration Required
+1. **Root directory test**: `npm test` - Verifies directory structure and configuration files
+2. **Frontend test**: `cd frontend && npm run test-connection` - Verifies frontend configuration
+3. **Backend test**: `cd backend-new && npm run test-connection` - Tests database connection
 
-The database needs to be updated to match the new schema:
-- Add `ironRate`, `washAndIronRate`, `dryCleanRate` columns to products table
-- Add `service` column to order_items table
-- Populate existing data with appropriate values
-- Update sample products with correct service rates
+## Running the Application
 
-## Verification Steps
+### Development Mode
+To run both frontend and backend in development mode:
+```bash
+npm start
+```
 
-1. Run the SQL migration commands in Supabase
-2. Restart the backend server
-3. Refresh the frontend application
-4. Test adding products to cart
-5. Verify correct service rates are applied
-6. Test quantity updates
-7. Test discount functionality
-8. Process a complete order
-9. Verify totals are calculated correctly
+### Individual Components
+To run only the frontend:
+```bash
+npm run frontend
+```
+
+To run only the backend:
+```bash
+npm run backend
+```
+
+### Manual Start
+Alternatively, you can start each component manually:
+
+1. Backend:
+   ```bash
+   cd backend-new
+   npm run dev
+   ```
+
+2. Frontend:
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+
+## Environment Variables
+
+### Backend (.env)
+- `DB_HOST` - Database host (default: localhost)
+- `DB_USER` - Database user (default: root)
+- `DB_PASSWORD` - Database password (default: empty)
+- `DB_NAME` - Database name (default: Pos_system)
+- `DB_PORT` - Database port (default: 3306)
+- `PORT` - Server port (default: 3004)
+
+### Frontend (.env)
+- `VITE_API_URL` - Backend API URL (default: http://localhost:3004)

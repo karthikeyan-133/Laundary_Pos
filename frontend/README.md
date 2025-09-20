@@ -1,93 +1,56 @@
-# Welcome to your Lovable project
+# Tally POS Frontend
 
-## Project info
+## Project Overview
 
-**URL**: https://lovable.dev/projects/39a7ca94-b000-405e-8c50-521c9519dae0
+This is the frontend for the Tally POS system, built with React, TypeScript, and Vite.
 
-## How can I edit this code?
+## Setup Instructions
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/39a7ca94-b000-405e-8c50-521c9519dae0) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-- Node.js
-- Express
-- MySQL
-
-## Database Integration
-
-This project now uses a MySQL database for data persistence instead of localStorage. 
-
-To set up the database:
-
-1. Create a MySQL database named `Pos_system`
-2. Create a dedicated user with privileges:
-   ```sql
-   CREATE USER 'pos_user'@'localhost' IDENTIFIED BY 'Welc0me$27';
-   GRANT ALL PRIVILEGES ON Pos_system.* TO 'pos_user'@'localhost';
-   FLUSH PRIVILEGES;
+1. **Install dependencies**:
+   ```bash
+   npm install
    ```
-3. Update the database configuration in `../backend/.env`
-4. Run the database initialization script from `../backend/init_db.sql`
-5. Start the backend server from the `../backend` directory
 
-## How can I deploy this project?
+2. **Configure environment variables**:
+   Create a `.env` file based on `.env.example` and set `VITE_API_URL` to match your backend URL (typically `http://localhost:3004` for local development)
 
-Simply open [Lovable](https://lovable.dev/projects/39a7ca94-b000-405e-8c50-521c9519dae0) and click on Share -> Publish.
+3. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
 
-## Can I connect a custom domain to my Lovable project?
+   The frontend will run on port 5173 by default.
 
-Yes, you can!
+## Available Scripts
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## Project Structure
+
+- `src/components/` - React components
+- `src/services/` - API service functions
+- `src/hooks/` - Custom React hooks
+- `src/types/` - TypeScript type definitions
+- `src/utils/` - Utility functions
+
+## Connecting to Backend
+
+The frontend connects to the backend API through the URL specified in the `VITE_API_URL` environment variable. For local development, this should be set to `http://localhost:3004`.
+
+## Troubleshooting
+
+### CORS Issues
+
+If you encounter CORS errors:
+
+1. Ensure the backend CORS configuration allows your frontend origin (typically `http://localhost:5173`)
+2. Check that both servers are running
+3. Verify the `VITE_API_URL` in the frontend `.env` file matches the backend URL
+
+### API Connection Issues
+
+1. Verify the backend server is running
+2. Check that the `VITE_API_URL` is correctly set in the `.env` file
+3. Ensure there are no firewall or network issues blocking the connection

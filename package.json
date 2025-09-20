@@ -1,48 +1,25 @@
 {
-  "name": "tally_pos",
+  "name": "tally-pos-system",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Tally POS System with React frontend and Node.js/Express backend",
   "scripts": {
-    "start": "node backend-new/server.js",
-    "dev": "node backend-new/server.js",
-    "init-db": "node backend-new/init-db.js",
-    "init-empty-db": "node backend-new/init-empty-db.js",
-    "create-tables": "node backend-new/create-tables.js",
-    "verify-tables": "node backend-new/verify-tables.js",
-    "create-user": "node backend-new/create-user.js",
-    "setup-cpanel": "echo 'For cPanel setup, please follow the instructions in CPANEL_DATABASE_SETUP.md'",
-    "test-connection": "node backend-new/test-supabase-connection.js",
-    "check-env": "node backend-new/check-env.js",
-    "clear-data": "node backend-new/clear-data.js",
-    "migrate-data": "node backend-new/migrate-existing-data.js",
-    "test-api": "node backend-new/test-api.js",
-    "test-orders": "node backend-new/test-orders-data.js",
-    "test-db-structure": "node backend-new/test-db-structure.js",
-    "auto-migrate": "node backend-new/auto-migrate-db.js",
-    "verify-migration": "node backend-new/verify-migration.js",
-    "complete-migration": "node backend-new/run-complete-migration.js",
-    "verify-complete-migration": "node backend-new/verify-complete-migration.js",
-    "print-migration-sql": "node backend-new/print-migration-sql.js",
-    "build-frontend": "cd frontend && npm run build",
-    "deploy-backend": "cd backend-new && vercel --prod",
-    "test-backend": "cd backend-new && node test-connection.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "concurrently \"cd frontend && npm run dev\" \"cd backend-new && npm run dev\"",
+    "test": "node test-connection.js",
+    "dev": "concurrently \"cd frontend && npm run dev\" \"cd backend-new && npm run dev\"",
+    "frontend": "cd frontend && npm run dev",
+    "backend": "cd backend-new && npm run dev"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "keywords": [
+    "pos",
+    "laundry",
+    "react",
+    "nodejs",
+    "express",
+    "mysql"
+  ],
+  "author": "Tally POS Team",
+  "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.2",
-    "express": "^4.21.1",
-    "jspdf": "^3.0.3",
-    "jspdf-autotable": "^5.0.2",
-    "mysql2": "^3.14.5",
-    "node-fetch": "^3.3.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.10"
+    "concurrently": "^8.0.0"
   }
 }
