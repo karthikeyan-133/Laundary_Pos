@@ -15,12 +15,12 @@ const getApiBaseUrl = () => {
       // Return the specific backend URL for Vercel deployments
       return 'https://pos-laundry-backend.vercel.app';
     } else {
-      // For local development
-      return 'http://localhost:3000';
+      // For local development - changed from port 3000 to 3004
+      return 'http://localhost:3004';
     }
   }
   // For server-side rendering, fallback to localhost
-  return 'http://localhost:3000';
+  return 'http://localhost:3004';
 };
 
 const API_BASE_URL = getApiBaseUrl();
