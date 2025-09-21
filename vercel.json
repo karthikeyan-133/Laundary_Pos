@@ -27,6 +27,18 @@
       "dest": "backend-new/api/db-test.js"
     },
     {
+      "src": "/api/routing-debug",
+      "dest": "backend-new/api/routing-debug.js"
+    },
+    {
+      "src": "/api/full-env-test",
+      "dest": "backend-new/api/full-env-test.js"
+    },
+    {
+      "src": "/api/db-connection-test",
+      "dest": "backend-new/api/db-connection-test.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "backend-new/server.js"
     },

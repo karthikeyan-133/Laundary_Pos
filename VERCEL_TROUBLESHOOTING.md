@@ -8,12 +8,48 @@ You're still experiencing 500 Internal Server errors when accessing the backend 
 - https://pos-laundry-backend.vercel.app/api/customers
 - https://pos-laundry-backend.vercel.app/api/orders
 
+You're also experiencing 404 NOT_FOUND errors when testing diagnostic endpoints.
+
 ## Root Cause
 The 500 Internal Server errors indicate that the backend application is failing to start or connect to the database properly in the Vercel environment.
 
+## Diagnostic Endpoints Summary
+
+We've created several diagnostic endpoints to help troubleshoot your Vercel deployment issues:
+
+1. **Health Check**: `https://pos-laundry-backend.vercel.app/api/health`
+   - Basic endpoint to verify Vercel routing is working
+
+2. **Environment Variables Test**: `https://pos-laundry-backend.vercel.app/api/test-env`
+   - Shows which environment variables are set
+
+3. **Routing Debug**: `https://pos-laundry-backend.vercel.app/api/routing-debug`
+   - Shows detailed information about how Vercel is routing requests
+
+4. **Server Test**: `https://pos-laundry-backend.vercel.app/api/test-server`
+   - Tests if the Express server is working correctly
+
+5. **Full Environment Test**: `https://pos-laundry-backend.vercel.app/api/full-env-test`
+   - Comprehensive test of environment variables and database connectivity
+
+6. **Detailed Database Connection Test**: `https://pos-laundry-backend.vercel.app/api/db-connection-test`
+   - Detailed test of database connection with multiple configuration attempts
+
 ## Troubleshooting Steps
 
-### 1. Check Environment Variables in Vercel Dashboard
+### 1. Debug 404 Routing Issues
+
+If you're getting 404 errors when accessing endpoints, first use the routing debug endpoint:
+```
+https://pos-laundry-backend.vercel.app/api/routing-debug
+```
+
+This will show you exactly what Vercel sees when routing requests. Check the response to verify:
+- The URL is being routed correctly
+- The request method is correct
+- Environment variables are available
+
+### 2. Check Environment Variables in Vercel Dashboard
 
 1. Go to your Vercel project dashboard
 2. Navigate to Settings > Environment Variables
@@ -26,7 +62,7 @@ The 500 Internal Server errors indicate that the backend application is failing 
    DB_PORT=3306
    ```
 
-### 2. Test Environment Variables
+### 3. Test Environment Variables
 
 After setting the environment variables, you can test if they're properly configured by visiting:
 ```
@@ -35,7 +71,17 @@ https://pos-laundry-backend.vercel.app/api/test-env
 
 This endpoint will show you which environment variables are set and which are missing.
 
-### 3. Verify Database Connectivity
+For a more comprehensive test that also checks database connectivity:
+```
+https://pos-laundry-backend.vercel.app/api/full-env-test
+```
+
+For a detailed database connection test with multiple configuration attempts:
+```
+https://pos-laundry-backend.vercel.app/api/db-connection-test
+```
+
+### 4. Verify Database Connectivity
 
 Make sure your MySQL database is accessible from Vercel:
 1. Your database host must be publicly accessible (not localhost)
@@ -43,12 +89,30 @@ Make sure your MySQL database is accessible from Vercel:
 3. The database credentials must be correct
 4. The database must have the required tables created
 
-### 4. Check Vercel Function Logs
+### 4. Debug Routing Issues
+
+If you're getting 404 errors, you can debug the routing with:
+```
+https://pos-laundry-backend.vercel.app/api/routing-debug
+```
+
+This endpoint will show you exactly what Vercel sees when routing requests, which can help identify configuration issues.
+
+### 5. Check Vercel Function Logs
 
 1. Go to your Vercel project dashboard
 2. Click on the "Functions" tab
 3. Look for any functions with errors
 4. Click on individual function logs to see detailed error messages
+
+### 6. Test Express Server Directly
+
+You can test if the Express server is working correctly with:
+```
+https://pos-laundry-backend.vercel.app/api/test-server
+```
+
+This endpoint bypasses the serverless functions and goes directly to your Express server.
 
 ### 5. Manual Database Table Creation
 
@@ -142,13 +206,13 @@ CREATE TABLE IF NOT EXISTS return_items (
 );
 ```
 
-### 6. Redeploy the Application
+### 7. Redeploy the Application
 
 After making changes to environment variables:
 1. Trigger a new deployment in Vercel
 2. Or push a new commit to trigger an automatic deployment
 
-### 7. Test Database Connection Locally
+### 8. Test Database Connection Locally
 
 Before deploying, you can test the database connection locally:
 

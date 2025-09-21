@@ -102,6 +102,16 @@ app.get('/test-cors', (req, res) => {
   });
 });
 
+// Simple test endpoint to verify server is working
+app.get('/api/test-server', (req, res) => {
+  console.log('Test server endpoint called');
+  res.json({ 
+    message: 'Server test successful',
+    timestamp: new Date().toISOString(),
+    server: 'Express server is running correctly'
+  });
+});
+
 // ✅ Add CORS check endpoint
 app.get("/api/cors-check", (req, res) => {
   res.json({ cors: "ok" });

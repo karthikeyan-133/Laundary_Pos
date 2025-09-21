@@ -67,6 +67,8 @@ If you're experiencing 500 Internal Server Errors after deployment:
 3. Check that your database credentials are correct
 4. Make sure your database is accessible from Vercel's servers
 
+We've created several diagnostic endpoints to help troubleshoot deployment issues. See [DIAGNOSTIC_ENDPOINTS.md](DIAGNOSTIC_ENDPOINTS.md) for detailed information on how to use these endpoints.
+
 You can test the database connection using the health check endpoint:
 ```
 GET /health
