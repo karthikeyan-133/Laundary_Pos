@@ -44,10 +44,10 @@ const corsOptions = {
       'http://127.0.0.1:8080',     // Alternative localhost for port 8080
       'http://127.0.0.1:8081',     // Alternative localhost for port 8081
       'https://pos-laundry-ajish.vercel.app',  // Previous frontend domain
-      'https://pos-laundry-eight.vercel.app',  // Current frontend domain
+      'https://laundary-pos.vercel.app/',  // Current frontend domain
       'https://pos-laundry-tau.vercel.app',  // Production frontend
       'https://billing-pos-yjh9.vercel.app',   // Another possible frontend
-      'https://pos-laundry-backend.vercel.app',   // Current backend URL
+      'https://laundary-pos-zb3p.vercel.app/',   // Current backend URL
       'https://laundary-pos.vercel.app',   // Current frontend URL
       'https://laundary-pos-zb3p.vercel.app'   // Current backend URL
     ];
