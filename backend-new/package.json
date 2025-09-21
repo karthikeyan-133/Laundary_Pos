@@ -8,7 +8,6 @@
     "dev": "nodemon server.js",
     "test-connection": "node test-connection.js",
     "test-db": "node test-db-connection.js",
-    "test-cors": "node cors-test-fix.js",
     "create-tables": "node create-tables.js"
   },
   "keywords": [],
