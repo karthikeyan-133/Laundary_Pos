@@ -15,30 +15,6 @@
   ],
   "routes": [
     {
-      "src": "/api/test",
-      "dest": "backend-new/api/test.js"
-    },
-    {
-      "src": "/api/products",
-      "dest": "backend-new/api/products.js"
-    },
-    {
-      "src": "/api/customers",
-      "dest": "backend-new/api/customers.js"
-    },
-    {
-      "src": "/api/orders",
-      "dest": "backend-new/api/orders.js"
-    },
-    {
-      "src": "/api/settings",
-      "dest": "backend-new/api/settings.js"
-    },
-    {
-      "src": "/api/returns",
-      "dest": "backend-new/api/returns.js"
-    },
-    {
       "src": "/api/(.*)",
       "dest": "backend-new/server.js"
     },

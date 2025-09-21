@@ -49,6 +49,29 @@ The application uses the following environment variables (set in `.env`):
 - `DB_PORT`: Database port (default: 3306)
 - `PORT`: Server port (default: 3001)
 
+## Vercel Deployment
+
+### Environment Variables
+When deploying to Vercel, you must set the following environment variables in the Vercel dashboard:
+- `DB_HOST`: Your database host
+- `DB_USER`: Your database user
+- `DB_PASSWORD`: Your database password
+- `DB_NAME`: Your database name (Pos_system)
+- `DB_PORT`: Your database port (usually 3306)
+
+### Fixing 500 Internal Server Errors
+If you're experiencing 500 Internal Server Errors after deployment:
+
+1. Ensure all required environment variables are set in the Vercel dashboard
+2. Verify that your database accepts external connections
+3. Check that your database credentials are correct
+4. Make sure your database is accessible from Vercel's servers
+
+You can test the database connection using the health check endpoint:
+```
+GET /health
+```
+
 ## API Endpoints
 
 - `GET /` - Health check

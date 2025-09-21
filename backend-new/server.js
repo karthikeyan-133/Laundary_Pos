@@ -65,6 +65,9 @@ const corsOptions = {
 // Apply CORS middleware to all routes
 app.use(cors(corsOptions));
 
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
 // Simple middleware to ensure CORS headers are set
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -73,7 +76,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Use returns router
 app.use('/api/returns', returnsRouter);

@@ -25,7 +25,10 @@ if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_NAME) {
   if (!isVercel) {
     console.log('Expected .env path:', path.resolve(__dirname, '.env'));
   }
-  process.exit(1);
+  // Don't exit in Vercel environment as it might cause issues
+  if (!isVercel) {
+    process.exit(1);
+  }
 }
 
 // Create a connection pool to the database
@@ -38,7 +41,11 @@ const pool = mysql.createPool({
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   connectTimeout: 30000, // 30 seconds timeout
   connectionLimit: 10, // Limit connections to prevent overload
-  queueLimit: 0
+  queueLimit: 0,
+  // Add error handling for the connection
+  acquireTimeout: 60000,
+  timeout: 60000,
+  reconnect: true
 });
 
 // Get a promise-based connection from the pool
@@ -50,6 +57,7 @@ async function testConnection() {
     const connection = await promisePool.getConnection();
     console.log('✅ Successfully connected to the MySQL database.');
     connection.release();
+    return true;
   } catch (err) {
     console.error('Error connecting to the MySQL database:', err);
     console.log('\nTroubleshooting steps:');
@@ -57,11 +65,14 @@ async function testConnection() {
     console.log('2. Check that your database and user exist');
     console.log('3. Verify your database credentials (username, password)');
     console.log('4. Ensure MySQL server is running');
+    return false;
   }
 }
 
-// Run test connection
-testConnection();
+// Run test connection only in local development
+if (!isVercel) {
+  testConnection();
+}
 
 // Export the pool and helper functions
 module.exports = {
@@ -72,6 +83,7 @@ module.exports = {
       return rows;
     } catch (error) {
       console.error('Database query error:', error);
+      // Re-throw the error so it can be handled by the calling function
       throw error;
     }
   },

@@ -41,7 +41,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
       ...options.headers,
     },
     // Add timeout to prevent hanging requests
-    signal: AbortSignal.timeout(15000), // 15 second timeout
+    signal: AbortSignal.timeout(30000), // 30 second timeout
     ...options,
     // Only include credentials for same-origin requests
     // For cross-origin requests, we'll rely on CORS headers
@@ -72,6 +72,13 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
         errorObj.status = response.status;
         throw errorObj;
       }
+    }
+    
+    // Handle empty responses (like 204 No Content)
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      // For non-JSON responses, return null or empty object
+      return null as unknown as T;
     }
     
     const result = await response.json();
@@ -152,7 +159,10 @@ type POSSettings = {
 
 // Products API
 export const productsApi = {
-  getAll: () => apiRequest<Product[]>('/products'),
+  getAll: () => apiRequest<Product[]>('/products').catch(error => {
+    console.error('Failed to fetch products:', error);
+    throw new Error(`Failed to fetch products: ${error.message}`);
+  }),
   getById: (id: string) => apiRequest<Product>(`/products/${id}`),
   create: (product: Omit<Product, 'id'>) => apiRequest<Product>('/products', {
     method: 'POST',
@@ -177,7 +187,10 @@ export const productsApi = {
 
 // Customers API
 export const customersApi = {
-  getAll: () => apiRequest<Customer[]>('/customers'),
+  getAll: () => apiRequest<Customer[]>('/customers').catch(error => {
+    console.error('Failed to fetch customers:', error);
+    throw new Error(`Failed to fetch customers: ${error.message}`);
+  }),
   getById: (id: string) => apiRequest<Customer>(`/customers/${id}`),
   create: (customer: Omit<Customer, 'id'>) => apiRequest<Customer>('/customers', {
     method: 'POST',
@@ -188,7 +201,10 @@ export const customersApi = {
 // Orders API
 export const ordersApi = {
   getAll: async () => {
-    const orders = await apiRequest<Order[]>('/orders');
+    const orders = await apiRequest<Order[]>('/orders').catch(error => {
+      console.error('Failed to fetch orders:', error);
+      throw new Error(`Failed to fetch orders: ${error.message}`);
+    });
     console.log('=== ORDERS API RESPONSE ===');
     console.log('Raw orders data:', orders);
     console.log('Orders count:', orders.length);
@@ -229,7 +245,10 @@ export const settingsApi = {
     business_address: data.business_address || data.businessAddress,
     business_phone: data.business_phone || data.businessPhone,
     barcode_scanner_enabled: data.barcode_scanner_enabled !== undefined ? data.barcode_scanner_enabled : data.barcodeScannerEnabled
-  })),
+  })).catch(error => {
+    console.error('Failed to fetch settings:', error);
+    throw new Error(`Failed to fetch settings: ${error.message}`);
+  }),
   update: (settings: Partial<POSSettings>) => apiRequest<any>('/settings', {
     method: 'PUT',
     body: JSON.stringify({
@@ -248,4 +267,16 @@ export const settingsApi = {
     business_phone: data.business_phone || data.businessPhone,
     barcode_scanner_enabled: data.barcode_scanner_enabled !== undefined ? data.barcode_scanner_enabled : data.barcodeScannerEnabled
   })),
+};
+
+// Returns API
+export const returnsApi = {
+  getAll: () => apiRequest<any[]>('/returns').catch(error => {
+    console.error('Failed to fetch returns:', error);
+    throw new Error(`Failed to fetch returns: ${error.message}`);
+  }),
+  create: (returnData: any) => apiRequest<any>('/returns', {
+    method: 'POST',
+    body: JSON.stringify(returnData),
+  }),
 };

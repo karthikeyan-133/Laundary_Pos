@@ -146,43 +146,54 @@ router.get('/', async (req, res) => {
     
     // For each return, get its items with product information
     const returnsWithItems = await Promise.all(returns.map(async (returnRecord) => {
-      // Get return items with product information
-      const items = await db.query(`
-        SELECT ri.*, p.name as product_name, p.barcode, p.ironRate, p.washAndIronRate, p.dryCleanRate
-        FROM return_items ri
-        LEFT JOIN products p ON ri.product_id = p.id
-        WHERE ri.return_id = ?
-      `, [returnRecord.id]);
-      
-      // Get customer information through order
-      const orderCustomer = await db.query(`
-        SELECT o.id, c.name as customer_name
-        FROM orders o
-        LEFT JOIN customers c ON o.customer_id = c.id
-        WHERE o.id = ?
-      `, [returnRecord.order_id]);
-      
-      // Convert numeric fields to proper JavaScript numbers
-      const convertedReturnRecord = {
-        ...returnRecord,
-        refund_amount: Number(returnRecord.refund_amount) || 0
-      };
-      
-      // Convert numeric fields in return items
-      const convertedItems = items.map(item => ({
-        ...item,
-        quantity: Number(item.quantity) || 0,
-        refund_amount: Number(item.refund_amount) || 0,
-        ironRate: item.ironRate ? Number(item.ironRate) : undefined,
-        washAndIronRate: item.washAndIronRate ? Number(item.washAndIronRate) : undefined,
-        dryCleanRate: item.dryCleanRate ? Number(item.dryCleanRate) : undefined
-      }));
-      
-      return {
-        ...convertedReturnRecord,
-        return_items: convertedItems,
-        orders: orderCustomer.length > 0 ? orderCustomer[0] : null
-      };
+      try {
+        // Get return items with product information
+        const items = await db.query(`
+          SELECT ri.*, p.name as product_name, p.barcode, p.ironRate, p.washAndIronRate, p.dryCleanRate
+          FROM return_items ri
+          LEFT JOIN products p ON ri.product_id = p.id
+          WHERE ri.return_id = ?
+        `, [returnRecord.id]);
+        
+        // Get customer information through order
+        const orderCustomer = await db.query(`
+          SELECT o.id, c.name as customer_name
+          FROM orders o
+          LEFT JOIN customers c ON o.customer_id = c.id
+          WHERE o.id = ?
+        `, [returnRecord.order_id]);
+        
+        // Convert numeric fields to proper JavaScript numbers
+        const convertedReturnRecord = {
+          ...returnRecord,
+          refund_amount: Number(returnRecord.refund_amount) || 0
+        };
+        
+        // Convert numeric fields in return items
+        const convertedItems = items.map(item => ({
+          ...item,
+          quantity: Number(item.quantity) || 0,
+          refund_amount: Number(item.refund_amount) || 0,
+          ironRate: item.ironRate ? Number(item.ironRate) : undefined,
+          washAndIronRate: item.washAndIronRate ? Number(item.washAndIronRate) : undefined,
+          dryCleanRate: item.dryCleanRate ? Number(item.dryCleanRate) : undefined
+        }));
+        
+        return {
+          ...convertedReturnRecord,
+          return_items: convertedItems,
+          orders: orderCustomer.length > 0 ? orderCustomer[0] : null
+        };
+      } catch (err) {
+        console.error('Error processing return record:', err);
+        // Return the return record without items if there's an error
+        return {
+          ...returnRecord,
+          refund_amount: Number(returnRecord.refund_amount) || 0,
+          return_items: [],
+          orders: null
+        };
+      }
     }));
     
     console.log('Returns fetched:', returnsWithItems);
