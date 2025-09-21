@@ -15,8 +15,16 @@
   ],
   "routes": [
     {
+      "src": "/api/health",
+      "dest": "backend-new/api/health.js"
+    },
+    {
       "src": "/api/test-env",
       "dest": "backend-new/api/test-env.js"
+    },
+    {
+      "src": "/api/db-test",
+      "dest": "backend-new/api/db-test.js"
     },
     {
       "src": "/api/(.*)",
