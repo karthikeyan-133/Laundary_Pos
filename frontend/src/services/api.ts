@@ -13,7 +13,7 @@ const getApiBaseUrl = () => {
     if (window.location.hostname.includes('vercel.app')) {
       // For Vercel deployments, we need to use the specific backend URL
       // since frontend and backend are deployed separately
-      return 'https://pos-laundry-backend.vercel.app';
+      return 'https://laundary-pos-zb3p.vercel.app';
     } else {
       // For local development - use localhost:3004
       return 'http://localhost:3004';

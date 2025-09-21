@@ -47,7 +47,9 @@ const corsOptions = {
       'https://pos-laundry-eight.vercel.app',  // Current frontend domain
       'https://pos-laundry-tau.vercel.app',  // Production frontend
       'https://billing-pos-yjh9.vercel.app',   // Another possible frontend
-      'https://pos-laundry-backend.vercel.app'   // Current backend URL
+      'https://pos-laundry-backend.vercel.app',   // Current backend URL
+      'https://laundary-pos.vercel.app',   // Current frontend URL
+      'https://laundary-pos-zb3p.vercel.app'   // Current backend URL
     ];
     
     // Check if the origin is in our allowed list
