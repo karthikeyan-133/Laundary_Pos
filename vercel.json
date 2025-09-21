@@ -15,55 +15,12 @@
   ],
   "routes": [
     {
-      "src": "/api/health",
-      "dest": "backend-new/api/health.js"
-    },
-    {
-      "src": "/api/test-env",
-      "dest": "backend-new/api/test-env.js"
-    },
-    {
-      "src": "/api/db-test",
-      "dest": "backend-new/api/db-test.js"
-    },
-    {
-      "src": "/api/routing-debug",
-      "dest": "backend-new/api/routing-debug.js"
-    },
-    {
-      "src": "/api/full-env-test",
-      "dest": "backend-new/api/full-env-test.js"
-    },
-    {
-      "src": "/api/db-connection-test",
-      "dest": "backend-new/api/db-connection-test.js"
-    },
-    {
       "src": "/api/(.*)",
       "dest": "backend-new/server.js"
     },
     {
       "src": "/(.*)",
       "dest": "frontend/dist/$1"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-        }
-      ]
     }
   ]
 }
