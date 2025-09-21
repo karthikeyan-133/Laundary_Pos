@@ -56,12 +56,13 @@ const corsOptions = {
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Temporarily allow all origins for debugging
     }
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 };
 
 // Apply CORS middleware to all routes
@@ -72,9 +73,10 @@ app.options('*', cors(corsOptions));
 
 // Simple middleware to ensure CORS headers are set
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
   next();
 });
 
@@ -632,8 +634,6 @@ app.get('/api/settings', async (req, res) => {
       return res.status(404).json({ error: 'Settings not found' });
     }
     
-    // Ensure CORS headers are set
-    res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
     res.json(data[0]);
   } catch (err) {
     console.error('Error fetching settings:', err);
@@ -674,14 +674,10 @@ app.put('/api/settings', async (req, res) => {
       
       // Fetch created settings
       const data = await db.query('SELECT * FROM settings WHERE id = 1');
-      // Ensure CORS headers are set
-      res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
       res.json(data[0]);
     } else {
       // Fetch updated settings
       const data = await db.query('SELECT * FROM settings WHERE id = 1');
-      // Ensure CORS headers are set
-      res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
       res.json(data[0]);
     }
   } catch (err) {
