@@ -92,6 +92,14 @@ CREATE TABLE IF NOT EXISTS return_items (
   refund_amount DECIMAL(10, 2) NOT NULL
 );
 
+-- Add table for ID sequences
+CREATE TABLE IF NOT EXISTS id_sequences (
+  prefix VARCHAR(10) PRIMARY KEY,
+  counter_value INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- Add foreign key constraints
 ALTER TABLE orders ADD CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL;
 ALTER TABLE order_items ADD CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;

@@ -17,6 +17,7 @@ const { router: authRouter, authenticateToken } = require('./auth');
 
 // Import MySQL database interface instead of Supabase
 const db = require('./mysqlDb');
+const { generateSequentialId, initializeSequences } = require('./utils/idGenerator');
 
 // Import returns router
 const returnsRouter = require('./returns');
@@ -405,11 +406,11 @@ app.get('/api/customers/:id', async (req, res) => {
 });
 
 app.post('/api/customers', async (req, res) => {
-  // Generate a unique ID if not provided
-  const id = req.body.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  const { name, code, contact_name, phone, email, place, emirate } = req.body;
-  
   try {
+    // Generate a sequential customer ID with C prefix
+    const id = await generateSequentialId('C', 5, db);
+    const { name, code, contact_name, phone, email, place, emirate } = req.body;
+    
     const result = await db.query(
       'INSERT INTO customers (id, name, code, contact_name, phone, email, place, emirate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -503,11 +504,11 @@ app.get('/api/orders/:id', async (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-  // Generate a unique ID if not provided
-  const id = req.body.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  const { customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status, items } = req.body;
-  
   try {
+    // Generate a sequential order ID with TRX prefix
+    const id = await generateSequentialId('TRX', 6, db);
+    const { customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status, items } = req.body;
+    
     // Insert order, ensuring undefined values are converted to null for the database
     const result = await db.query(
       'INSERT INTO orders (id, customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -530,7 +531,8 @@ app.post('/api/orders', async (req, res) => {
     // Insert order items
     if (items && items.length > 0) {
       for (const item of items) {
-        const itemId = item.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        // Generate a sequential ID for order items with ITM prefix
+        const itemId = await generateSequentialId('ITM', 6, db);
         await db.query(
           'INSERT INTO order_items (id, order_id, product_id, quantity, discount, subtotal, service) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [
@@ -717,6 +719,31 @@ if (!process.env.VERCEL) {
     }
   });
 }
+
+// Initialize the database connection and start the server
+async function startServer() {
+  try {
+    // Test database connection
+    await db.query('SELECT 1');
+    console.log('✅ Successfully connected to MySQL database');
+    
+    // Initialize sequence counters
+    await initializeSequences(db);
+    console.log('✅ Sequence counters initialized');
+    
+    // Start the server
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📡 Access server at: http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error('❌ Failed to start server:', err);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 // Export the app for Vercel
 module.exports = app;

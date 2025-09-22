@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('./mysqlDb');
+const { generateSequentialId } = require('./utils/idGenerator');
 
 const router = express.Router();
 
@@ -44,8 +45,8 @@ router.post('/', async (req, res) => {
   }
   
   try {
-    // Generate a unique ID for the return
-    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    // Generate a sequential return ID with R prefix
+    const id = await generateSequentialId('R', 5, db);
     console.log('Generated return ID:', id);
     
     // Insert return record
@@ -66,12 +67,16 @@ router.post('/', async (req, res) => {
     
     // Insert return items
     if (items && items.length > 0) {
-      const returnItems = items.map(item => ({
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        return_id: id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        refund_amount: item.refund_amount
+      const returnItems = await Promise.all(items.map(async (item) => {
+        // Generate a sequential ID for return items with RI prefix
+        const itemId = await generateSequentialId('RI', 6, db);
+        return {
+          id: itemId,
+          return_id: id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          refund_amount: item.refund_amount
+        };
       }));
       
       console.log('Creating return items:', returnItems);

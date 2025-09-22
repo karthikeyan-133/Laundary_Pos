@@ -91,6 +91,13 @@ const tables = [
     product_id VARCHAR(255),
     quantity INT NOT NULL,
     refund_amount DECIMAL(10, 2) NOT NULL
+  )`,
+  
+  `CREATE TABLE IF NOT EXISTS id_sequences (
+    prefix VARCHAR(10) PRIMARY KEY,
+    counter_value INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )`
 ];
 
