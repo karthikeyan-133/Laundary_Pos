@@ -132,7 +132,10 @@ async function testConnection() {
 
 // Run test connection only in local development
 if (!isVercel) {
-  testConnection();
+  // Don't block startup on connection test
+  testConnection().catch(err => {
+    console.error('Database connection test failed during startup:', err);
+  });
 }
 
 // Export the pool and helper functions

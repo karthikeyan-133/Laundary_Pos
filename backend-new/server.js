@@ -160,6 +160,36 @@ app.get("/api/health-check", (req, res) => {
   });
 });
 
+// Database health check endpoint
+app.get("/api/db-health", async (req, res) => {
+  try {
+    console.log('Testing database connection...');
+    const result = await db.query('SELECT 1 as connected');
+    
+    if (result.length > 0 && result[0].connected === 1) {
+      res.json({ 
+        status: "ok", 
+        message: "Database connection successful",
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(503).json({ 
+        status: "error", 
+        message: "Database connection test failed",
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (err) {
+    console.error('Database health check failed:', err);
+    res.status(503).json({ 
+      status: "error", 
+      message: "Database connection failed",
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 app.get('/health', async (req, res) => {
   try {
     // Test MySQL connection
@@ -775,48 +805,17 @@ async function startServer() {
       console.log(`📡 Access server at: http://localhost:${PORT}`);
     });
   } catch (err) {
-    console.error('❌ Failed to start server:', err);
-    if (err.code === 'ETIMEDOUT') {
-      console.error('\n🔧 ETIMEDOUT Error Troubleshooting:');
-      console.error('This error means the connection attempt to your database timed out.');
-      console.error('Possible causes and solutions:');
-      console.error('1. ❌ Incorrect DB_HOST in .env file');
-      console.error('   Solution: Verify your database host is correct');
-      console.error('2. ❌ Remote MySQL not enabled in cPanel');
-      console.error('   Solution: Enable Remote MySQL in your cPanel');
-      console.error('3. ❌ Your IP is not whitelisted');
-      console.error('   Solution: Add your IP to Remote MySQL whitelist in cPanel');
-      console.error('4. ❌ Firewall blocking outgoing connections on port 3306');
-      console.error('   Solution: Check your firewall settings');
-      console.error('5. ❌ Hosting provider uses a different port');
-      console.error('   Solution: Check with your hosting provider for correct port');
-      console.error('6. ❌ Hosting provider requires a specific hostname');
-      console.error('   Solution: Check with your hosting provider for correct hostname');
-      console.error('\n🔧 Diagnostic Steps:');
-      console.error('1. Try connecting with a MySQL client:');
-      console.error('   mysql -h techzontech.com -u techzontech_Pos_user -p techzontech_Lanundry_Pos');
-      console.error('2. Check if you can reach the host:');
-      console.error('   ping techzontech.com');
-      console.error('3. Check if port 3306 is accessible:');
-      console.error('   telnet techzontech.com 3306');
-      console.error('   or');
-      console.error('   nc -zv techzontech.com 3306');
-    } else if (err.code === 'ECONNREFUSED') {
-      console.error('\n🔧 ECONNREFUSED Error Troubleshooting:');
-      console.error('This error means the connection was actively refused by the server.');
-      console.error('Possible causes:');
-      console.error('1. MySQL server is not running on the host');
-      console.error('2. MySQL is not accepting connections from your IP');
-      console.error('3. Incorrect port number');
-    } else if (err.code === 'ER_ACCESS_DENIED_ERROR') {
-      console.error('\n🔧 Access Denied Error Troubleshooting:');
-      console.error('This error means your credentials are incorrect.');
-      console.error('Possible causes:');
-      console.error('1. Incorrect username or password');
-      console.error('2. User does not have permission to access the database');
-      console.error('3. User is not allowed to connect from your IP');
-    }
-    process.exit(1);
+    console.error('❌ Database connection failed during startup:', err);
+    console.log('\n🔧 Server will start without database connection. You can still test API endpoints.');
+    console.log('🔧 Please check your cPanel Remote MySQL settings and IP whitelist.');
+    
+    // Start the server even without database connection
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${PORT} (without database connection)`);
+      console.log(`📡 Access server at: http://localhost:${PORT}`);
+      console.log('🔧 Database connection will be retried when API endpoints are accessed');
+    });
   }
 }
 
