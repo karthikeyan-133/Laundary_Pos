@@ -7,26 +7,25 @@
       "config": {
         "distDir": "dist"
       }
-    },
-    {
-      "src": "backend-new/server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["backend-new/**"]
-      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend-new/server.js",
+      "dest": "/backend-new/server.js",
       "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/dist/$1"
+      "dest": "/frontend/dist/$1"
     }
   ],
+  "functions": {
+    "backend-new/server.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",

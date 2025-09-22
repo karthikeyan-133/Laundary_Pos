@@ -151,6 +151,15 @@ app.get("/api/debug-cors", (req, res) => {
   });
 });
 
+// Simple health check endpoint
+app.get("/api/health-check", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    message: "API is running",
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/health', async (req, res) => {
   try {
     // Test MySQL connection

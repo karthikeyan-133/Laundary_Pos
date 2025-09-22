@@ -1,5 +1,15 @@
 const axios = require('axios');
 
+// Simple API test endpoint
+module.exports = (req, res) => {
+  res.json({ 
+    message: 'API test successful',
+    timestamp: new Date().toISOString(),
+    path: req.url,
+    method: req.method
+  });
+};
+
 // Test the authentication endpoints
 async function testAuthEndpoints() {
   const baseURL = 'http://localhost:3006/api/auth';
