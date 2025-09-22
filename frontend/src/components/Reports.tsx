@@ -290,7 +290,9 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
       return;
     }
 
+    // Create receipt HTML that matches the Receipt component style
     const receiptContent = `
+      <!DOCTYPE html>
       <html>
         <head>
           <title>Receipt - ${order.id}</title>
@@ -299,8 +301,12 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
               font-family: Arial, sans-serif; 
               margin: 0; 
               padding: 10px;
-              width: 4in; /* 4 inch width */
+              width: 4in;
               max-width: 4in;
+            }
+            .receipt-container {
+              background: white;
+              padding: 10px;
             }
             .receipt-header { 
               text-align: center; 
@@ -315,209 +321,163 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
               margin-bottom: 10px; 
               font-size: 12px;
             }
-            .receipt-items { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin-bottom: 10px; 
+            .receipt-items-header {
+              display: grid;
+              grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
+              gap: 1px;
               font-size: 12px;
-            }
-            .receipt-items th, .receipt-items td { 
-              padding: 4px 2px; 
-              text-align: left; 
-            }
-            .receipt-items th { 
+              font-weight: bold;
+              margin-bottom: 5px;
               border-bottom: 1px solid #000;
+              padding-bottom: 2px;
+            }
+            .receipt-item {
+              display: grid;
+              grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
+              gap: 1px;
               font-size: 12px;
+              margin-bottom: 2px;
             }
             .receipt-totals { 
               width: 100%; 
-              border-collapse: collapse; 
               font-size: 12px;
             }
-            .receipt-totals td { 
-              padding: 2px; 
-              text-align: right; 
+            .receipt-totals div {
+              display: grid;
+              grid-template-columns: 3fr 1fr;
+              gap: 4px;
+              margin-bottom: 2px;
             }
             .text-right { text-align: right; }
             .text-center { text-align: center; }
-            .mb-5 { margin-bottom: 5px; }
-            .mt-10 { margin-top: 10px; }
             .divider { 
               border-top: 1px dashed #000; 
               margin: 5px 0; 
             }
-            .item-name {
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              max-width: 120px;
-            }
-            .item-row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 3px;
-            }
-            .item-details {
-              flex: 1;
-            }
-            .item-amount {
-              text-align: right;
-            }
           </style>
         </head>
         <body>
-          <div class="receipt-header">
-            <div class="receipt-title">${settings.businessName}</div>
-            <div style="font-size: 12px;">${settings.businessAddress}</div>
-            <div style="font-size: 12px;">Phone: ${settings.businessPhone}</div>
+          <div class="receipt-container">
+            <div class="receipt-header">
+              <div class="receipt-title">Prime Zone</div>
+              <div style="font-size: 12px;">Address: A 126</div>
+              <div style="font-size: 12px;">UAE 4582</div>
+              <div style="font-size: 12px;">UAE</div>
+              <div style="font-size: 12px;">TRN: 56556665</div>
+              <div class="divider"></div>
+              <div><strong>TAX INVOICE</strong></div>
+            </div>
+            
+            <div class="receipt-info">
+              <div>Invoice No: ${order.id}</div>
+              <div>Date: ${new Date(order.createdAt).toLocaleDateString('en-US', { 
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })}</div>
+              <div>Time: ${new Date(order.createdAt).toLocaleTimeString('en-US', { 
+                hour: '2-digit',
+                minute: '2-digit'
+              })}</div>
+              <div>Buyer: ${order.customer?.name || 'Walk-in Customer'}</div>
+              <div>TRN:</div>
+              <div>User: ${order.customer?.name || 'Walk-in Customer'}</div>
+            </div>
+            
             <div class="divider"></div>
-            <div><strong>RECEIPT</strong></div>
-          </div>
-          
-          <div class="receipt-info">
-            <div>Order ID: ${order.id}</div>
-            <div>Date: ${new Date(order.createdAt).toLocaleString('en-US', { 
-              timeZone: 'Asia/Dubai',
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}</div>
-            <div>Customer: ${order.customer?.name || 'Walk-in Customer'}</div>
-            <div>Payment: ${order.paymentMethod}</div>
-          </div>
-          
-          <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
-            <strong>Items:</strong>
-          </div>
-          
-          <div>
-            ${order.items.map(item => {
-              // Debugging: Log item and product data in receipt generation
-              console.log('Generating receipt for item:', item);
-              console.log('Receipt item product:', item.product);
-              console.log('Receipt item product name:', item.product?.name);
-              console.log('Receipt item product type:', typeof item.product);
-              console.log('Receipt item product keys:', item.product ? Object.keys(item.product) : 'No product');
-              
-              // Robust product name and price extraction with multiple fallbacks
-              let productName = 'Unknown Product';
-              let price = 0;
-              
-              try {
-                // Check multiple possible product data structures
+            
+            <div class="receipt-items-header">
+              <div>SI</div>
+              <div class="text-left">Description</div>
+              <div>VAT %</div>
+              <div>Qty</div>
+              <div>Rate</div>
+              <div class="text-right">Amount</div>
+            </div>
+            
+            <div class="receipt-items">
+              ${order.items.map((item, index) => {
+                // Get service rate
+                let serviceRate = 0;
                 if (item.product && typeof item.product === 'object') {
-                  // Extract product name with validation
-                  if (typeof item.product.name === 'string' && item.product.name.trim() !== '') {
-                    productName = item.product.name;
-                  } else if (item.product.name && typeof item.product.name === 'string') {
-                    productName = item.product.name;
-                  }
-                  
-                  // Remove any "(X items)" text that might be part of the product name
-                  if (productName && typeof productName === 'string') {
-                    productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
-                  }
-                  
-                  // Get the correct price based on service
                   if (item.service) {
                     switch (item.service) {
                       case 'iron':
-                        price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                        serviceRate = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
                         break;
                       case 'washAndIron':
-                        price = typeof item.product.washAndIronRate === 'number' ? item.product.washAndIronRate : 0;
+                        serviceRate = typeof item.product.washAndIronRate === 'number' ? item.product.washAndIronRate : 0;
                         break;
                       case 'dryClean':
-                        price = typeof item.product.dryCleanRate === 'number' ? item.product.dryCleanRate : 0;
+                        serviceRate = typeof item.product.dryCleanRate === 'number' ? item.product.dryCleanRate : 0;
                         break;
                       default:
-                        price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                        serviceRate = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
                     }
                   } else {
-                    // Default to ironRate if no service specified
-                    price = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
+                    serviceRate = typeof item.product.ironRate === 'number' ? item.product.ironRate : 0;
                   }
                 }
                 
-                // Alternative structure check
-                if (productName === 'Unknown Product' && typeof item === 'object' && item !== null) {
-                  if (typeof (item as any).name === 'string' && (item as any).name.trim() !== '') {
-                    productName = (item as any).name;
-                  } else if ((item as any).product_name && typeof (item as any).product_name === 'string') {
-                    productName = (item as any).product_name;
-                  }
-                  
-                  // Remove any "(X items)" text that might be part of the product name
-                  if (productName && typeof productName === 'string') {
-                    productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
-                  }
-                }
+                // Calculate item subtotal
+                const itemSubtotal = (item.quantity || 0) * serviceRate * (1 - (item.discount || 0) / 100);
                 
-                // Last resort: check for products property (plural) using type assertion
-                if (productName === 'Unknown Product' && (item as any).products && typeof (item as any).products === 'object') {
-                  if (typeof (item as any).products.name === 'string' && (item as any).products.name.trim() !== '') {
-                    productName = (item as any).products.name;
-                  }
-                  
-                  // Remove any "(X items)" text that might be part of the product name
-                  if (productName && typeof productName === 'string') {
-                    productName = productName.replace(/\(\d+\s+items?\)/gi, '').trim();
-                  }
-                }
-              } catch (error) {
-                console.error('Error extracting product data for receipt generation:', error);
-              }
-              
-              console.log('Final receipt product name result:', productName);
-              console.log('Final receipt price result:', price);
-              
-              return `
-                <div class="item-row">
-                  <div class="item-details">
-                    <div class="item-name">${productName}</div>
-                    <div>${item.quantity} × ${settings.currency}${price.toFixed(2)}</div>
+                // VAT calculation
+                const vatPercent = settings.taxRate || 5;
+                
+                return `
+                  <div class="receipt-item">
+                    <div>${index + 1}</div>
+                    <div>${item.product?.name || 'Unknown Product'}</div>
+                    <div>${vatPercent}%</div>
+                    <div>${item.quantity || 0}</div>
+                    <div>${serviceRate.toFixed(2)}</div>
+                    <div class="text-right">${itemSubtotal.toFixed(2)}</div>
                   </div>
-                  <div class="item-amount">${settings.currency}${item.subtotal.toFixed(2)}</div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-          
-          <div class="divider"></div>
-          
-          <div>
-            <div class="item-row">
-              <div>Subtotal:</div>
-              <div>${settings.currency}${order.subtotal.toFixed(2)}</div>
+                `;
+              }).join('')}
             </div>
-            ${order.discount > 0 ? `
-            <div class="item-row">
-              <div>Discount:</div>
-              <div>-${settings.currency}${order.discount.toFixed(2)}</div>
-            </div>
-            ` : ''}
-            <div class="item-row">
-              <div>Tax (${settings.taxRate}%):</div>
-              <div>${settings.currency}${order.tax.toFixed(2)}</div>
-            </div>
+            
             <div class="divider"></div>
-            <div class="item-row" style="font-weight: bold; font-size: 14px;">
-              <div>Total:</div>
-              <div>${settings.currency}${order.total.toFixed(2)}</div>
+            
+            <div class="receipt-totals">
+              <div>
+                <div>Discount:</div>
+                <div class="text-right">${settings.currency}${order.discount.toFixed(2)}</div>
+              </div>
+              <div>
+                <div>Output VAT @${settings.taxRate || 5}%:</div>
+                <div class="text-right">${settings.currency}${order.tax.toFixed(2)}</div>
+              </div>
+              <div>
+                <div>Rounding Off:</div>
+                <div class="text-right">${settings.currency}0.00</div>
+              </div>
+              <div>
+                <div>Total:</div>
+                <div class="text-right">${settings.currency}${order.subtotal.toFixed(2)}</div>
+              </div>
+              <div>
+                <div>VAT @${settings.taxRate || 5}%:</div>
+                <div class="text-right">${settings.currency}${order.tax.toFixed(2)}</div>
+              </div>
+              <div class="divider"></div>
+              <div style="font-weight: bold;">
+                <div>Total:</div>
+                <div class="text-right">${settings.currency}${order.total.toFixed(2)}</div>
+              </div>
             </div>
-          </div>
-          
-          <div class="text-center mt-10" style="font-size: 12px;">
-            <p>Thank you for your purchase!</p>
-            <p>Please visit again</p>
+            
+            <div class="divider"></div>
+            
+            <div class="text-center" style="font-size: 12px;">
+              <div>★★★★★ Thank you for your business ★★★★★</div>
+            </div>
           </div>
           
           <script>
             window.onload = function() {
               window.print();
-              // Close window after printing
               window.onfocus = function() { 
                 setTimeout(function() { window.close(); }, 500); 
               }
@@ -526,7 +486,7 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
         </body>
       </html>
     `;
-    
+
     const printWindow = window.open('', '_blank', 'width=400,height=600');
     if (printWindow) {
       printWindow.document.write(receiptContent);

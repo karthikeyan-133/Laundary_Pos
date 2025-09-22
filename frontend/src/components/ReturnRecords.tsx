@@ -177,7 +177,9 @@ export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: Return
     // Format items for receipt
     const returnItems = returnRecord.returnRecord.return_items || [];
     
+    // Create receipt HTML that matches the Receipt component style
     const receiptContent = `
+      <!DOCTYPE html>
       <html>
         <head>
           <title>Return Receipt - ${returnRecord.orderIdFull}</title>
@@ -188,6 +190,10 @@ export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: Return
               padding: 10px;
               width: 4in;
               max-width: 4in;
+            }
+            .receipt-container {
+              background: white;
+              padding: 10px;
             }
             .receipt-header { 
               text-align: center; 
@@ -202,106 +208,121 @@ export function ReturnRecords({ returns, onViewReceipt, onPrintReceipt }: Return
               margin-bottom: 10px; 
               font-size: 12px;
             }
-            .receipt-items { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin-bottom: 10px; 
+            .receipt-items-header {
+              display: grid;
+              grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
+              gap: 1px;
               font-size: 12px;
-            }
-            .receipt-items th, .receipt-items td { 
-              padding: 4px 2px; 
-              text-align: left; 
-            }
-            .receipt-items th { 
+              font-weight: bold;
+              margin-bottom: 5px;
               border-bottom: 1px solid #000;
+              padding-bottom: 2px;
+            }
+            .receipt-item {
+              display: grid;
+              grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
+              gap: 1px;
               font-size: 12px;
+              margin-bottom: 2px;
             }
             .receipt-totals { 
               width: 100%; 
-              border-collapse: collapse; 
               font-size: 12px;
             }
-            .receipt-totals td { 
-              padding: 2px; 
-              text-align: right; 
+            .receipt-totals div {
+              display: grid;
+              grid-template-columns: 3fr 1fr;
+              gap: 4px;
+              margin-bottom: 2px;
             }
             .text-right { text-align: right; }
             .text-center { text-align: center; }
-            .mb-5 { margin-bottom: 5px; }
-            .mt-10 { margin-top: 10px; }
             .divider { 
               border-top: 1px dashed #000; 
               margin: 5px 0; 
             }
-            .item-name {
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              max-width: 120px;
-            }
-            .item-row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 3px;
-            }
-            .item-details {
-              flex: 1;
-            }
-            .item-amount {
-              text-align: right;
-            }
           </style>
         </head>
         <body>
-          <div class="receipt-header">
-            <div class="receipt-title">${settings.businessName}</div>
-            <div style="font-size: 12px;">${settings.businessAddress}</div>
-            <div style="font-size: 12px;">Phone: ${settings.businessPhone}</div>
-            <div class="divider"></div>
-            <div><strong>RETURN RECEIPT</strong></div>
-          </div>
-          
-          <div class="receipt-info">
-            <div>Return ID: ${returnRecord.id}</div>
-            <div>Order ID: ${returnRecord.orderIdFull}</div>
-            <div>Date: ${dateStr} ${timeStr}</div>
-            <div>Customer: ${customerName}</div>
-          </div>
-          
-          <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
-            <strong>Returned Items:</strong>
-          </div>
-          
-          <div>
-            ${returnItems.map((item: any) => {
-              const productName = item.product_name || item.barcode || 'Unknown Product';
-              const quantity = item.quantity || 0;
-              const refundAmount = item.refund_amount !== undefined && item.refund_amount !== null ? 
-                (typeof item.refund_amount === 'string' ? parseFloat(item.refund_amount) : item.refund_amount) : 0;
-              
-              return `
-                <div class="item-row">
-                  <div class="item-details">
-                    <div class="item-name">${productName}</div>
-                    <div>${quantity} × ${settings.currency}${Number(quantity > 0 ? refundAmount / quantity : 0).toFixed(2)}</div>
-                  </div>
-                  <div class="item-amount">${settings.currency}${Number(refundAmount).toFixed(2)}</div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-          
-          <div class="divider"></div>
-          
-          <div>
-            <div class="item-row" style="font-weight: bold; font-size: 14px;">
-              <div>Total Refund:</div>
-              <div>${settings.currency}${Number(returnRecord.subtotal).toFixed(2)}</div>
+          <div class="receipt-container">
+            <div class="receipt-header">
+              <div class="receipt-title">Prime Zone</div>
+              <div style="font-size: 12px;">Address: A 126</div>
+              <div style="font-size: 12px;">UAE 4582</div>
+              <div style="font-size: 12px;">UAE</div>
+              <div style="font-size: 12px;">TRN: 56556665</div>
+              <div class="divider"></div>
+              <div><strong>TAX RETURN</strong></div>
             </div>
-          </div>
-          
-          <div class="text-center mt-10" style="font-size: 12px;">
-            <p>Thank you!</p>
+            
+            <div class="receipt-info">
+              <div>Return ID: ${returnRecord.id}</div>
+              <div>Invoice No: ${returnRecord.orderIdFull}</div>
+              <div>Date: ${dateStr}</div>
+              <div>Time: ${timeStr}</div>
+              <div>Buyer: ${customerName}</div>
+              <div>TRN:</div>
+              <div>User: ${customerName}</div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="receipt-items-header">
+              <div>SI</div>
+              <div class="text-left">Description</div>
+              <div>VAT %</div>
+              <div>Qty</div>
+              <div>Rate</div>
+              <div class="text-right">Amount</div>
+            </div>
+            
+            <div class="receipt-items">
+              ${returnItems.map((item: any, index: number) => {
+                const productName = item.product_name || item.barcode || 'Unknown Product';
+                const quantity = item.quantity || 0;
+                const refundAmount = item.refund_amount !== undefined && item.refund_amount !== null ? 
+                  (typeof item.refund_amount === 'string' ? parseFloat(item.refund_amount) : item.refund_amount) : 0;
+                
+                // Calculate the unit price for display
+                const unitPrice = quantity > 0 ? refundAmount / quantity : 0;
+                const vatPercent = settings.taxRate || 5;
+                
+                return `
+                  <div class="receipt-item">
+                    <div>${index + 1}</div>
+                    <div>${productName}</div>
+                    <div>${vatPercent}%</div>
+                    <div>${quantity}</div>
+                    <div>${Number(unitPrice).toFixed(2)}</div>
+                    <div class="text-right">${Number(refundAmount).toFixed(2)}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="receipt-totals">
+              <div>
+                <div>Return Subtotal:</div>
+                <div class="text-right">${settings.currency}${(returnRecord.subtotal * (100 / (100 + (settings.taxRate || 5)))).toFixed(2)}</div>
+              </div>
+              <div>
+                <div>Output VAT @${settings.taxRate || 5}%:</div>
+                <div class="text-right">${settings.currency}${(returnRecord.subtotal - (returnRecord.subtotal * (100 / (100 + (settings.taxRate || 5))))).toFixed(2)}</div>
+              </div>
+              <div class="divider"></div>
+              <div style="font-weight: bold;">
+                <div>Refund Total:</div>
+                <div class="text-right">${settings.currency}${Number(returnRecord.subtotal).toFixed(2)}</div>
+              </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="text-center" style="font-size: 12px;">
+              <div>★★★★★ Thank you for your business ★★★★★</div>
+            </div>
           </div>
           
           <script>
