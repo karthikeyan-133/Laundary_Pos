@@ -8,6 +8,10 @@
     "dev": "nodemon server.js",
     "test-db": "node test-db-connection.js",
     "test-db-vercel": "node test-db-connection-vercel.js",
+    "test-cpanel": "node test-cpanel-connection.js",
+    "test-detailed": "node detailed-diagnostic.js",
+    "verify-connection": "node verify-connection.js",
+    "check-admin": "node check-admin.js",
     "create-tables": "node create-tables.js"
   },
   "keywords": [],

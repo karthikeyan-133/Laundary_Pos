@@ -15,6 +15,7 @@ console.log('Host:', process.env.DB_HOST || 'localhost');
 console.log('User:', process.env.DB_USER || 'root');
 console.log('Database:', process.env.DB_NAME || 'Pos_system');
 console.log('Port:', process.env.DB_PORT || 3306);
+console.log('SSL:', process.env.DB_SSL === 'true' ? 'enabled' : 'disabled');
 console.log('Running on Vercel:', !!isVercel);
 
 // Check if environment variables are loaded
@@ -31,6 +32,17 @@ if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_NAME) {
   }
 }
 
+// Add DNS resolution logging
+const dns = require('dns');
+
+dns.lookup(process.env.DB_HOST || 'localhost', (err, address, family) => {
+  if (err) {
+    console.error('❌ DNS lookup failed for DB_HOST:', err);
+  } else {
+    console.log('DNS lookup result for DB_HOST:', { address, family });
+  }
+});
+
 // Create a connection pool to the database
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -39,8 +51,13 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'Pos_system',
   port: process.env.DB_PORT || 3306,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  connectionLimit: 10, // Limit connections to prevent overload
-  queueLimit: 0
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
+  queueLimit: 0,
+  // Add connection timeout
+  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 20000, // 20 seconds
+  // Enable keep-alive
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
   // Removed invalid options that cause warnings
 });
 
@@ -50,6 +67,7 @@ const promisePool = pool.promise();
 // Test the connection
 async function testConnection() {
   try {
+    console.log('Attempting database connection...');
     const connection = await promisePool.getConnection();
     console.log('✅ Successfully connected to the MySQL database.');
     connection.release();
@@ -61,6 +79,10 @@ async function testConnection() {
     console.log('2. Check that your database and user exist');
     console.log('3. Verify your database credentials (username, password)');
     console.log('4. Ensure MySQL server is running');
+    console.log('5. For cPanel databases, ensure remote MySQL access is enabled');
+    console.log('6. For cPanel databases, ensure your IP is whitelisted');
+    console.log('7. Try connecting with a MySQL client to verify credentials');
+    console.log('8. Check if your hosting provider requires a specific database host');
     return false;
   }
 }

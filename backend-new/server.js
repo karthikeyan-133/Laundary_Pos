@@ -56,6 +56,9 @@ app.use((req, res, next) => {
   } else if (!origin) {
     // For requests with no origin (like mobile apps or curl requests)
     res.header('Access-Control-Allow-Origin', '*');
+  } else if (process.env.NODE_ENV === 'development') {
+    // In development, allow all origins for easier testing
+    res.header('Access-Control-Allow-Origin', origin || '*');
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -712,9 +715,15 @@ if (!process.env.VERCEL) {
 // Initialize the database connection and start the server
 async function startServer() {
   try {
-    // Test database connection
-    await db.query('SELECT 1');
-    console.log('✅ Successfully connected to MySQL database');
+    console.log('Testing database connection...');
+    // Test database connection with a simple query
+    const result = await db.query('SELECT 1 as connected');
+    
+    if (result.length > 0 && result[0].connected === 1) {
+      console.log('✅ Successfully connected to MySQL database');
+    } else {
+      throw new Error('Database connection test failed');
+    }
     
     // Initialize sequence counters
     await initializeSequences(db);
@@ -728,6 +737,46 @@ async function startServer() {
     });
   } catch (err) {
     console.error('❌ Failed to start server:', err);
+    if (err.code === 'ETIMEDOUT') {
+      console.error('\n🔧 ETIMEDOUT Error Troubleshooting:');
+      console.error('This error means the connection attempt to your database timed out.');
+      console.error('Possible causes and solutions:');
+      console.error('1. ❌ Incorrect DB_HOST in .env file');
+      console.error('   Solution: Verify your database host is correct');
+      console.error('2. ❌ Remote MySQL not enabled in cPanel');
+      console.error('   Solution: Enable Remote MySQL in your cPanel');
+      console.error('3. ❌ Your IP is not whitelisted');
+      console.error('   Solution: Add your IP to Remote MySQL whitelist in cPanel');
+      console.error('4. ❌ Firewall blocking outgoing connections on port 3306');
+      console.error('   Solution: Check your firewall settings');
+      console.error('5. ❌ Hosting provider uses a different port');
+      console.error('   Solution: Check with your hosting provider for correct port');
+      console.error('6. ❌ Hosting provider requires a specific hostname');
+      console.error('   Solution: Check with your hosting provider for correct hostname');
+      console.error('\n🔧 Diagnostic Steps:');
+      console.error('1. Try connecting with a MySQL client:');
+      console.error('   mysql -h techzontech.com -u techzontech_Pos_user -p techzontech_Lanundry_Pos');
+      console.error('2. Check if you can reach the host:');
+      console.error('   ping techzontech.com');
+      console.error('3. Check if port 3306 is accessible:');
+      console.error('   telnet techzontech.com 3306');
+      console.error('   or');
+      console.error('   nc -zv techzontech.com 3306');
+    } else if (err.code === 'ECONNREFUSED') {
+      console.error('\n🔧 ECONNREFUSED Error Troubleshooting:');
+      console.error('This error means the connection was actively refused by the server.');
+      console.error('Possible causes:');
+      console.error('1. MySQL server is not running on the host');
+      console.error('2. MySQL is not accepting connections from your IP');
+      console.error('3. Incorrect port number');
+    } else if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('\n🔧 Access Denied Error Troubleshooting:');
+      console.error('This error means your credentials are incorrect.');
+      console.error('Possible causes:');
+      console.error('1. Incorrect username or password');
+      console.error('2. User does not have permission to access the database');
+      console.error('3. User is not allowed to connect from your IP');
+    }
     process.exit(1);
   }
 }
