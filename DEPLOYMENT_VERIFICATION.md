@@ -159,3 +159,82 @@ If none of the above solutions work:
 1. Check Vercel status page for service issues
 2. Contact Vercel support with details of your configuration
 3. Consider using a different deployment platform temporarily
+
+# Deployment Verification Guide
+
+This guide will help you verify that your Tally POS application is correctly deployed to Vercel with proper CORS configuration.
+
+## 1. Verify Frontend Deployment
+
+1. Go to your Vercel dashboard: https://vercel.com/dashboard
+2. Find your project (likely named "laundary-pos" or similar)
+3. Check that the latest deployment shows as "Success"
+4. Click on the deployment to view details
+5. Verify that both frontend and backend builds completed successfully
+
+## 2. Test API Endpoints
+
+After deployment, test these endpoints using your browser or a tool like Postman:
+
+1. **Health Check**: `https://your-deployment-url.vercel.app/api/health`
+2. **CORS Check**: `https://your-deployment-url.vercel.app/api/cors-check`
+3. **Server Test**: `https://your-deployment-url.vercel.app/api/test-server`
+
+You should receive JSON responses from all these endpoints.
+
+## 3. Verify CORS Configuration
+
+1. Open your deployed application in the browser
+2. Open Developer Tools (F12)
+3. Go to the Network tab
+4. Perform an action that makes an API request (like loading the dashboard)
+5. Check the request headers for any API call:
+   - Look for the `Origin` header in the request
+   - Look for `Access-Control-Allow-Origin` in the response headers
+   - The response should include your frontend URL in the `Access-Control-Allow-Origin` header
+
+## 4. Common Issues and Solutions
+
+### Issue: CORS errors persist
+**Solution**:
+1. Make sure you've redeployed your application after making changes
+2. Check that your `.env.production` file has `VITE_API_URL=` (empty value)
+3. Verify that your frontend and backend are deployed in the same Vercel project
+
+### Issue: API returns 404 errors
+**Solution**:
+1. Check your `vercel.json` routing configuration
+2. Ensure the API routes are correctly mapped to your backend server
+
+### Issue: Database connection errors
+**Solution**:
+1. Verify your cPanel database credentials in `backend-new/.env`
+2. Ensure Remote MySQL is enabled in cPanel
+3. Check that your IP is whitelisted in cPanel's Remote MySQL settings
+
+## 5. Redeployment Steps
+
+To apply any changes you've made:
+
+1. Commit your changes to git:
+   ```bash
+   git add .
+   git commit -m "Fix CORS configuration"
+   git push origin main
+   ```
+
+2. Vercel should automatically deploy your changes
+3. Alternatively, you can manually trigger a deployment from your Vercel dashboard
+
+## 6. Verification Checklist
+
+Before considering the deployment successful, verify that:
+
+- [ ] Frontend loads without errors
+- [ ] API endpoints are accessible
+- [ ] No CORS errors in browser console
+- [ ] Database connection is working
+- [ ] Authentication works (you can sign in)
+- [ ] All CRUD operations work (create, read, update, delete)
+
+If you encounter any issues, check the browser console and server logs in Vercel for detailed error messages.

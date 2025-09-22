@@ -38,5 +38,19 @@ This is a Point of Sale (POS) system for a laundry business.
 - Enable remote MySQL access in cPanel
 - Update [.env](file://c:/Users/TECHZON-17/Desktop/Tally_Pos/backend-new/.env) file with cPanel database credentials
 
+## Deployment to Vercel
+
+To deploy the application to Vercel:
+
+1. Push your code to a GitHub repository
+2. Connect the repository to Vercel
+3. Configure the project settings:
+   - Build command: `cd frontend && npm run build`
+   - Output directory: `frontend/dist`
+   - Install command: `npm install && cd frontend && npm install`
+4. Add environment variables in Vercel dashboard if needed
+
 ## Troubleshooting
 If you encounter database connection issues, refer to the [cPanel Connection Troubleshooting Guide](CPANEL_CONNECTION_TROUBLESHOOTING.md)
+
+If you encounter deployment issues, refer to the [Deployment Verification Guide](DEPLOYMENT_VERIFICATION.md)
