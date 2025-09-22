@@ -31,50 +31,12 @@ const app = express();
 const PORT = process.env.PORT || 3005;
 console.log('Server configured to run on port:', PORT);
 
-// ✅ Enable CORS for your frontend - Updated for Vercel deployment
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // List of allowed origins
-    const allowedOrigins = [
-      'http://localhost:5173',     // Default Vite development server
-      'http://localhost:5174',     // Alternative Vite development server
-      'http://localhost:8080',     // Another development server port
-      'http://localhost:8081',     // Another development server port
-      'http://127.0.0.1:5173',     // Alternative localhost
-      'http://127.0.0.1:5174',     // Alternative localhost
-      'http://127.0.0.1:8080',     // Alternative localhost for port 8080
-      'http://127.0.0.1:8081',     // Alternative localhost for port 8081
-      'https://laundary-pos.vercel.app',  // Current frontend domain
-      'https://laundary-pos-zb3p.vercel.app'   // Current backend URL
-    ];
-    
-    // Check if the origin is in our allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      // For development/debugging, log the origin that's being blocked
-      console.log('CORS blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  credentials: true,
-  optionsSuccessStatus: 200,
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
-};
-
-// Apply CORS middleware to all routes
-app.use(cors(corsOptions));
-
-// Handle preflight requests explicitly
-app.options('*', cors(corsOptions));
-
-// Simple middleware to ensure CORS headers are set
+// ✅ Custom CORS middleware to ensure headers are always set
 app.use((req, res, next) => {
   const origin = req.get('Origin');
+  console.log('Request received from origin:', origin);
+  
+  // List of allowed origins
   const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5174',
@@ -88,19 +50,29 @@ app.use((req, res, next) => {
     'https://laundary-pos-zb3p.vercel.app'
   ];
   
+  // Set CORS headers
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   } else if (!origin) {
-    // For requests with no origin (like mobile apps)
+    // For requests with no origin (like mobile apps or curl requests)
     res.header('Access-Control-Allow-Origin', '*');
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Auth-Token');
   res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
   next();
 });
 
+// Apply express.json middleware
 app.use(express.json({ limit: '10mb' }));
 
 // Use returns router
