@@ -1150,7 +1150,7 @@ export function Reports({ orders, onReturnOrder, settings }: ReportsProps) {
                     
                     return (
                       <tr key={order.id} className="border-b hover:bg-muted/50">
-                        <td className="py-2">#{order.id.slice(-6)}</td>
+                        <td className="py-2">{order.id}</td>
                         <td className="py-2">
                           {formatDate(order.createdAt)}
                         </td>

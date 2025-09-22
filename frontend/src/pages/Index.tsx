@@ -202,8 +202,202 @@ const Index = () => {
 
   // Function to handle printing a receipt
   const handlePrintReceipt = (order: Order) => {
-    // This would typically generate and print a receipt
-    alert(`Printing receipt for order ${order.id}`);
+    // Find the return record for this order
+    const returnRecord = returns.find(r => r.order_id === order.id);
+    
+    if (!returnRecord) {
+      alert(`No return record found for order ${order.id}`);
+      return;
+    }
+    
+    if (!settings) {
+      alert('Settings not available for receipt generation');
+      return;
+    }
+    
+    // Format date and time
+    const formatDate = (dateString: string) => {
+      try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+          return { dateStr: 'Invalid Date', timeStr: 'Invalid Time' };
+        }
+        // Adjust for Dubai time (UTC+4)
+        const dubaiTime = new Date(date.getTime() + (4 * 60 * 60 * 1000));
+        const dateStr = dubaiTime.toLocaleDateString('en-US', { 
+          timeZone: 'Asia/Dubai',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+        const timeStr = dubaiTime.toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          hour12: true,
+          timeZone: 'Asia/Dubai'
+        });
+        return { dateStr, timeStr };
+      } catch (err) {
+        console.error('Error formatting date:', dateString, err);
+        return { dateStr: 'Invalid Date', timeStr: 'Invalid Time' };
+      }
+    };
+    
+    const { dateStr, timeStr } = formatDate(returnRecord.created_at);
+    
+    // Get customer name if available
+    const customerName = returnRecord.orders?.customer_name || 'Walk-in Customer';
+    
+    // Format items for receipt
+    const returnItems = returnRecord.return_items || [];
+    
+    const receiptContent = `
+      <html>
+        <head>
+          <title>Return Receipt - ${returnRecord.order_id}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 10px;
+              width: 4in;
+              max-width: 4in;
+            }
+            .receipt-header { 
+              text-align: center; 
+              margin-bottom: 10px; 
+            }
+            .receipt-title { 
+              font-size: 18px; 
+              font-weight: bold; 
+              margin-bottom: 5px;
+            }
+            .receipt-info { 
+              margin-bottom: 10px; 
+              font-size: 12px;
+            }
+            .receipt-items { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 10px; 
+              font-size: 12px;
+            }
+            .receipt-items th, .receipt-items td { 
+              padding: 4px 2px; 
+              text-align: left; 
+            }
+            .receipt-items th { 
+              border-bottom: 1px solid #000;
+              font-size: 12px;
+            }
+            .receipt-totals { 
+              width: 100%; 
+              border-collapse: collapse; 
+              font-size: 12px;
+            }
+            .receipt-totals td { 
+              padding: 2px; 
+              text-align: right; 
+            }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .mb-5 { margin-bottom: 5px; }
+            .mt-10 { margin-top: 10px; }
+            .divider { 
+              border-top: 1px dashed #000; 
+              margin: 5px 0; 
+            }
+            .item-name {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              max-width: 120px;
+            }
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 3px;
+            }
+            .item-details {
+              flex: 1;
+            }
+            .item-amount {
+              text-align: right;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-header">
+            <div class="receipt-title">${settings.businessName}</div>
+            <div style="font-size: 12px;">${settings.businessAddress}</div>
+            <div style="font-size: 12px;">Phone: ${settings.businessPhone}</div>
+            <div class="divider"></div>
+            <div><strong>RETURN RECEIPT</strong></div>
+          </div>
+          
+          <div class="receipt-info">
+            <div>Return ID: ${returnRecord.id}</div>
+            <div>Order ID: ${returnRecord.order_id}</div>
+            <div>Date: ${dateStr} ${timeStr}</div>
+            <div>Customer: ${customerName}</div>
+          </div>
+          
+          <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
+            <strong>Returned Items:</strong>
+          </div>
+          
+          <div>
+            ${returnItems.map((item: any) => {
+              const productName = item.product_name || item.barcode || 'Unknown Product';
+              const quantity = item.quantity || 0;
+              const refundAmount = item.refund_amount !== undefined && item.refund_amount !== null ? 
+                (typeof item.refund_amount === 'string' ? parseFloat(item.refund_amount) : item.refund_amount) : 0;
+              
+              // Calculate price per item
+              const pricePerItem = quantity > 0 ? refundAmount / quantity : 0;
+              
+              return `
+                <div class="item-row">
+                  <div class="item-details">
+                    <div class="item-name">${productName}</div>
+                    <div>${quantity} × ${settings.currency}${Number(pricePerItem).toFixed(2)}</div>
+                  </div>
+                  <div class="item-amount">${settings.currency}${Number(refundAmount).toFixed(2)}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div>
+            <div class="item-row" style="font-weight: bold; font-size: 14px;">
+              <div>Total Refund:</div>
+              <div>${settings.currency}${Number(returnRecord.refund_amount).toFixed(2)}</div>
+            </div>
+          </div>
+          
+          <div class="text-center mt-10" style="font-size: 12px;">
+            <p>Thank you!</p>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onfocus = function() { 
+                setTimeout(function() { window.close(); }, 500); 
+              }
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (printWindow) {
+      printWindow.document.write(receiptContent);
+      printWindow.document.close();
+    }
   };
 
   // Wrapper functions to handle async operations
