@@ -47,20 +47,17 @@ const corsOptions = {
       'http://127.0.0.1:5174',     // Alternative localhost
       'http://127.0.0.1:8080',     // Alternative localhost for port 8080
       'http://127.0.0.1:8081',     // Alternative localhost for port 8081
-      ,  // Previous frontend domain
-      'https://laundary-pos.vercel.app/',  // Current frontend domain
-       // Production frontend
-      
-      'https://laundary-pos-zb3p.vercel.app/',   // Current backend URL
-      'https://laundary-pos.vercel.app',   // Current frontend URL
+      'https://laundary-pos.vercel.app',  // Current frontend domain
       'https://laundary-pos-zb3p.vercel.app'   // Current backend URL
     ];
     
     // Check if the origin is in our allowed list
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(null, true); // Temporarily allow all origins for debugging
+      // For development/debugging, log the origin that's being blocked
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -77,7 +74,27 @@ app.options('*', cors(corsOptions));
 
 // Simple middleware to ensure CORS headers are set
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
+  const origin = req.get('Origin');
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:8080',
+    'http://localhost:8081',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:8081',
+    'https://laundary-pos.vercel.app',
+    'https://laundary-pos-zb3p.vercel.app'
+  ];
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    // For requests with no origin (like mobile apps)
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');

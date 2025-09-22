@@ -47,9 +47,8 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     // Add timeout to prevent hanging requests
     signal: AbortSignal.timeout(30000), // 30 second timeout
     ...options,
-    // Only include credentials for same-origin requests
-    // For cross-origin requests, we'll rely on CORS headers
-    credentials: 'same-origin'
+    // For cross-origin requests, we need to include credentials
+    credentials: 'include'
   };
 
   try {
