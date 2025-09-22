@@ -26,9 +26,9 @@ console.log('Returns router loaded:', !!returnsRouter);
 
 const app = express();
 
-// Use Vercel's PORT or default to 3005 for local development (changed from 3004 to avoid conflicts)
+// Use Vercel's PORT or default to 3002 for local development (changed from 3004 to avoid conflicts)
 // Vercel dynamically assigns a PORT through process.env.PORT
-const PORT = process.env.PORT || 3005;
+const PORT = process.env.PORT || 3002;
 console.log('Server configured to run on port:', PORT);
 
 // ✅ Custom CORS middleware to ensure headers are always set
@@ -799,10 +799,30 @@ async function startServer() {
     console.log('✅ Sequence counters initialized');
     
     // Start the server
-    const PORT = process.env.PORT || 3001;
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 Access server at: http://localhost:${PORT}`);
+    });
+    
+    // Handle server errors
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Please close the application using that port or use a different port.`);
+        // Try the next available port
+        const nextPort = PORT + 1;
+        console.log(`Trying port ${nextPort}...`);
+        const nextServer = app.listen(nextPort, '0.0.0.0', () => {
+          console.log(`🚀 Server running on port ${nextPort}`);
+          console.log(`📡 Access server at: http://localhost:${nextPort}`);
+        });
+        nextServer.on('error', (nextErr) => {
+          console.error(`Port ${nextPort} is also in use. Please close applications using ports ${PORT} and ${nextPort} or use a different port.`);
+          process.exit(1);
+        });
+      } else {
+        console.error('Server error:', err);
+        process.exit(1);
+      }
     });
   } catch (err) {
     console.error('❌ Database connection failed during startup:', err);
@@ -810,11 +830,32 @@ async function startServer() {
     console.log('🔧 Please check your cPanel Remote MySQL settings and IP whitelist.');
     
     // Start the server even without database connection
-    const PORT = process.env.PORT || 3001;
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT} (without database connection)`);
       console.log(`📡 Access server at: http://localhost:${PORT}`);
       console.log('🔧 Database connection will be retried when API endpoints are accessed');
+    });
+    
+    // Handle server errors
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Please close the application using that port or use a different port.`);
+        // Try the next available port
+        const nextPort = PORT + 1;
+        console.log(`Trying port ${nextPort}...`);
+        const nextServer = app.listen(nextPort, '0.0.0.0', () => {
+          console.log(`🚀 Server running on port ${nextPort} (without database connection)`);
+          console.log(`📡 Access server at: http://localhost:${nextPort}`);
+          console.log('🔧 Database connection will be retried when API endpoints are accessed');
+        });
+        nextServer.on('error', (nextErr) => {
+          console.error(`Port ${nextPort} is also in use. Please close applications using ports ${PORT} and ${nextPort} or use a different port.`);
+          process.exit(1);
+        });
+      } else {
+        console.error('Server error:', err);
+        process.exit(1);
+      }
     });
   }
 }
