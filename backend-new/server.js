@@ -12,6 +12,9 @@ if (!isVercel) {
   dotenv.config({ path: envPath });
 }
 
+// Import auth router and middleware
+const { router: authRouter, authenticateToken } = require('./auth');
+
 // Import MySQL database interface instead of Supabase
 const db = require('./mysqlDb');
 
@@ -22,9 +25,9 @@ console.log('Returns router loaded:', !!returnsRouter);
 
 const app = express();
 
-// Use Vercel's PORT or default to 3004 for local development (changed from 3003 to avoid conflicts)
+// Use Vercel's PORT or default to 3005 for local development (changed from 3004 to avoid conflicts)
 // Vercel dynamically assigns a PORT through process.env.PORT
-const PORT = process.env.PORT || 3004;
+const PORT = process.env.PORT || 3005;
 console.log('Server configured to run on port:', PORT);
 
 // ✅ Enable CORS for your frontend - Updated for Vercel deployment
@@ -85,6 +88,10 @@ app.use(express.json({ limit: '10mb' }));
 // Use returns router
 app.use('/api/returns', returnsRouter);
 console.log('Returns router mounted at /api/returns');
+
+// Use auth router
+app.use('/api/auth', authRouter);
+console.log('Auth router mounted at /api/auth');
 
 // Routes
 app.get('/', (req, res) => {
@@ -147,6 +154,13 @@ app.get('/health', async (req, res) => {
     });
   }
 });
+
+// Protect all API routes except auth routes
+app.use('/api/products', authenticateToken);
+app.use('/api/customers', authenticateToken);
+app.use('/api/orders', authenticateToken);
+app.use('/api/settings', authenticateToken);
+app.use('/api/returns', authenticateToken);
 
 // Products routes
 app.get('/api/products', async (req, res) => {

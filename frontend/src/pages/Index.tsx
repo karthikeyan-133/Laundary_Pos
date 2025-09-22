@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Order, CartItem, Product } from '@/types/pos';
 import { ProductManagement } from '@/components/ProductManagement';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'pos' | 'receipt' | 'dashboard' | 'reports' | 'products' | 'return-bills' | 'product-management' | 'home-delivery' | 'return-records'>('pos');
@@ -38,6 +39,7 @@ const Index = () => {
   const [returnItems, setReturnItems] = useState<Record<string, number>>({}); // Track return items
   const [returnReason, setReturnReason] = useState<string>(''); // Track return reason
   const navigate = useNavigate();
+  const { logout } = useAuth();
   
   const {
     products,
@@ -121,8 +123,9 @@ const Index = () => {
   }
 
   const handleLogout = () => {
+    logout();
     console.log('User logged out');
-    navigate('/');
+    navigate('/login');
   };
 
   const handleReturnOrder = (order: Order, type: 'complete' | 'partial' | null = null) => {

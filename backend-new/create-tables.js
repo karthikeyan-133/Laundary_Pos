@@ -37,9 +37,13 @@ const tables = [
     tax_rate DECIMAL(5, 2) DEFAULT 5.00,
     currency VARCHAR(10) DEFAULT 'AED',
     business_name VARCHAR(255) DEFAULT 'TallyPrime Café',
-    business_address TEXT DEFAULT 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE',
+    business_address TEXT,
     business_phone VARCHAR(255) DEFAULT '+971 4 123 4567',
     barcode_scanner_enabled BOOLEAN DEFAULT TRUE,
+    /* Admin credentials */
+    admin_username VARCHAR(255),
+    admin_email VARCHAR(255),
+    admin_password_hash VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )`,
@@ -103,8 +107,8 @@ const foreignKeys = [
 
 // Insert statements
 const inserts = [
-  `INSERT INTO settings (id, tax_rate, currency, business_name, business_address, business_phone, barcode_scanner_enabled)
-   VALUES (1, 5.00, 'AED', 'TallyPrime Café', 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE', '+971 4 123 4567', TRUE)
+  `INSERT INTO settings (id, tax_rate, currency, business_name, business_address, business_phone, barcode_scanner_enabled, admin_username, admin_email, admin_password_hash)
+   VALUES (1, 5.00, 'AED', 'TallyPrime Café', 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE', '+971 4 123 4567', TRUE, 'admin', 'admin@example.com', '$2a$10$8K1p/a0dURXAm7QiTRqNa.E3YPWs8UkrpC4rGHv7rIbx4s9usV6Wi')
    ON DUPLICATE KEY UPDATE id=id`,
   
   `INSERT INTO products (id, name, ironRate, washAndIronRate, dryCleanRate, category, barcode, description) VALUES

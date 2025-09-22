@@ -39,13 +39,9 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'Pos_system',
   port: process.env.DB_PORT || 3306,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  connectTimeout: 30000, // 30 seconds timeout
   connectionLimit: 10, // Limit connections to prevent overload
-  queueLimit: 0,
-  // Add error handling for the connection
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true
+  queueLimit: 0
+  // Removed invalid options that cause warnings
 });
 
 // Get a promise-based connection from the pool

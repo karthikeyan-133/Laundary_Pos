@@ -15,12 +15,12 @@ const getApiBaseUrl = () => {
       // since frontend and backend are deployed separately
       return 'https://laundary-pos-zb3p.vercel.app';
     } else {
-      // For local development - use localhost:3004
-      return 'http://localhost:3004';
+      // For local development - use localhost:3005 (updated from 3004)
+      return 'http://localhost:3005';
     }
   }
   // For server-side rendering, fallback to localhost
-  return 'http://localhost:3004';
+  return 'http://localhost:3005';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -35,9 +35,13 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
   
   console.log(`Making API request to: ${url}`, options);
   
+  // Get token from localStorage
+  const token = localStorage.getItem('adminToken');
+  
   const config: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...options.headers,
     },
     // Add timeout to prevent hanging requests
