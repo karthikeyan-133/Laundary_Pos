@@ -16,6 +16,7 @@ console.log('User:', process.env.DB_USER || 'root');
 console.log('Database:', process.env.DB_NAME || 'Pos_system');
 console.log('Port:', process.env.DB_PORT || 3306);
 console.log('SSL:', process.env.DB_SSL === 'true' ? 'enabled' : 'disabled');
+console.log('Force IPv4:', process.env.DB_FORCE_IPV4 === 'true' ? 'enabled' : 'disabled');
 console.log('Running on Vercel:', !!isVercel);
 
 // Check if environment variables are loaded
@@ -35,6 +36,12 @@ if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_NAME) {
 // Add DNS resolution logging
 const dns = require('dns');
 
+// Force IPv4 if requested
+if (process.env.DB_FORCE_IPV4 === 'true') {
+  console.log('Forcing IPv4 resolution...');
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 dns.lookup(process.env.DB_HOST || 'localhost', (err, address, family) => {
   if (err) {
     console.error('❌ DNS lookup failed for DB_HOST:', err);
@@ -51,13 +58,17 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'Pos_system',
   port: process.env.DB_PORT || 3306,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 5,
   queueLimit: 0,
   // Add connection timeout
-  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 20000, // 20 seconds
+  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 10000, // 10 seconds
+  acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 10000, // 10 seconds
+  timeout: parseInt(process.env.DB_TIMEOUT) || 10000, // 10 seconds
   // Enable keep-alive
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
+  // Handle reconnect
+  reconnect: true,
   // Removed invalid options that cause warnings
 });
 
@@ -74,15 +85,48 @@ async function testConnection() {
     return true;
   } catch (err) {
     console.error('Error connecting to the MySQL database:', err);
-    console.log('\nTroubleshooting steps:');
-    console.log('1. Verify your database host in .env file (DB_HOST)');
-    console.log('2. Check that your database and user exist');
-    console.log('3. Verify your database credentials (username, password)');
-    console.log('4. Ensure MySQL server is running');
-    console.log('5. For cPanel databases, ensure remote MySQL access is enabled');
-    console.log('6. For cPanel databases, ensure your IP is whitelisted');
-    console.log('7. Try connecting with a MySQL client to verify credentials');
-    console.log('8. Check if your hosting provider requires a specific database host');
+    if (err.code === 'ETIMEDOUT') {
+      console.error('\n🔧 ETIMEDOUT Error Troubleshooting:');
+      console.error('This error means the connection attempt to your database timed out.');
+      console.error('Possible causes and solutions:');
+      console.error('1. ❌ Incorrect DB_HOST in .env file');
+      console.error('   Solution: Verify your database host is correct');
+      console.error('2. ❌ Remote MySQL not enabled in cPanel');
+      console.error('   Solution: Enable Remote MySQL in your cPanel');
+      console.error('3. ❌ Your IP is not whitelisted');
+      console.error('   Solution: Add your IP to Remote MySQL whitelist in cPanel');
+      console.error('4. ❌ Firewall blocking outgoing connections on port 3306');
+      console.error('   Solution: Check your firewall settings');
+      console.error('5. ❌ Hosting provider uses a different port');
+      console.error('   Solution: Check with your hosting provider for correct port');
+      console.error('6. ❌ Hosting provider requires a specific hostname');
+      console.error('   Solution: Check with your hosting provider for correct hostname');
+      console.error('7. ❌ IPv6 connection issues');
+      console.error('   Solution: Force IPv4 connection with DB_FORCE_IPV4=true');
+      console.error('\n🔧 Diagnostic Steps:');
+      console.error('1. Try connecting with a MySQL client:');
+      console.error('   mysql -h techzontech.com -u techzontech_Pos_user -p techzontech_Lanundry_Pos');
+      console.error('2. Check if you can reach the host:');
+      console.error('   ping techzontech.com');
+      console.error('3. Check if port 3306 is accessible:');
+      console.error('   telnet techzontech.com 3306');
+      console.error('   or');
+      console.error('   nc -zv techzontech.com 3306');
+    } else if (err.code === 'ECONNREFUSED') {
+      console.error('\n🔧 ECONNREFUSED Error Troubleshooting:');
+      console.error('This error means the connection was actively refused by the server.');
+      console.error('Possible causes:');
+      console.error('1. MySQL server is not running on the host');
+      console.error('2. MySQL is not accepting connections from your IP');
+      console.error('3. Incorrect port number');
+    } else if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('\n🔧 Access Denied Error Troubleshooting:');
+      console.error('This error means your credentials are incorrect.');
+      console.error('Possible causes:');
+      console.error('1. Incorrect username or password');
+      console.error('2. User does not have permission to access the database');
+      console.error('3. User is not allowed to connect from your IP');
+    }
     return false;
   }
 }
