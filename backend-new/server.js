@@ -59,6 +59,10 @@ app.use((req, res, next) => {
   } else if (process.env.NODE_ENV === 'development') {
     // In development, allow all origins for easier testing
     res.header('Access-Control-Allow-Origin', origin || '*');
+  } else if (origin && origin.includes('vercel.app')) {
+    // For Vercel deployments, allow any vercel.app origin
+    // This helps with different deployment URLs
+    res.header('Access-Control-Allow-Origin', origin);
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
