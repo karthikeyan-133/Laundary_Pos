@@ -30,7 +30,6 @@ async function testConnection() {
       port: process.env.DB_PORT || 3306,
       ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
       connectTimeout: 10000, // 10 seconds
-      timeout: 10000, // 10 seconds
     });
 
     console.log('✅ Connection successful!');
@@ -49,7 +48,14 @@ async function testConnection() {
   } catch (error) {
     console.error('❌ Connection failed:', error);
     
-    if (error.code === 'ETIMEDOUT') {
+    if (error.code === 'ER_TOO_MANY_USER_CONNECTIONS') {
+      console.error('\n🔧 Too Many Connections Error:');
+      console.error('Your database user has reached the maximum number of connections.');
+      console.error('Possible solutions:');
+      console.error('1. Wait a few minutes and try again (connections may close automatically)');
+      console.error('2. Contact your hosting provider to increase connection limits');
+      console.error('3. Reduce the connection limit in your application');
+    } else if (error.code === 'ETIMEDOUT') {
       console.error('\n🔧 Troubleshooting steps:');
       console.error('1. Check that Remote MySQL is enabled in your cPanel');
       console.error('2. Verify your IP is whitelisted in cPanel Remote MySQL');

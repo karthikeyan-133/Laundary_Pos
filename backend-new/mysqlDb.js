@@ -58,12 +58,11 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'Pos_system',
   port: process.env.DB_PORT || 3306,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 5,
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 3, // Reduced from 5 to 3
   queueLimit: 0,
   // Add connection timeout
   connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 10000, // 10 seconds
   acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 10000, // 10 seconds
-  timeout: parseInt(process.env.DB_TIMEOUT) || 10000, // 10 seconds
   // Enable keep-alive
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
