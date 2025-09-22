@@ -18,7 +18,8 @@ export function CalculationDebug() {
   const [results, setResults] = useState({
     price: 0,
     subtotal: 0,
-    discountedSubtotal: 0
+    discountedSubtotal: 0,
+    tax: 0
   });
 
   const calculate = () => {
@@ -44,10 +45,18 @@ export function CalculationDebug() {
     const subtotal = quantity * price;
     const discountedSubtotal = subtotal * (1 - discount / 100);
     
+    // For tax-inclusive pricing, calculate pre-tax amount and tax
+    const taxRate = 5; // Assuming 5% tax rate for testing
+    const taxMultiplier = taxRate / 100;
+    const preTaxAmount = discountedSubtotal / (1 + taxMultiplier);
+    const taxAmount = discountedSubtotal - preTaxAmount;
+    const total = discountedSubtotal; // Total remains the same as it already includes tax
+    
     setResults({
       price,
-      subtotal,
-      discountedSubtotal
+      subtotal: preTaxAmount,
+      discountedSubtotal: total,
+      tax: taxAmount
     });
   };
 
@@ -122,8 +131,9 @@ export function CalculationDebug() {
           <div className="space-y-2 p-4 bg-muted rounded">
             <h3 className="font-bold">Results:</h3>
             <p>Price: AED {results.price.toFixed(2)}</p>
-            <p>Subtotal: AED {results.subtotal.toFixed(2)}</p>
-            <p>Discounted Subtotal: AED {results.discountedSubtotal.toFixed(2)}</p>
+            <p>Pre-tax Amount: AED {results.subtotal.toFixed(2)}</p>
+            <p>Tax (5%): AED {results.tax.toFixed(2)}</p>
+            <p>Total (including tax): AED {results.discountedSubtotal.toFixed(2)}</p>
           </div>
         </div>
       </CardContent>

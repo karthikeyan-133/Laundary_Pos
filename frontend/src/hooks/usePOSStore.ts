@@ -525,12 +525,19 @@ export function usePOSStore() {
     
     // Ensure taxRate is a number
     const taxRate = typeof settings.taxRate === 'string' ? parseFloat(settings.taxRate) : settings.taxRate;
-    const tax = discountedSubtotal * (taxRate / 100);
-    const total = discountedSubtotal + tax;
     
-    console.log('Calculated totals:', { subtotal, discount: discountAmount, tax, total });
+    // Calculate tax and totals for prices that already include tax
+    // If product price is 100 (including 5% tax), then:
+    // Pre-tax amount = 100 / 1.05 = 95.24
+    // Tax amount = 100 - 95.24 = 4.76
+    const taxMultiplier = taxRate / 100;
+    const preTaxAmount = discountedSubtotal / (1 + taxMultiplier);
+    const tax = discountedSubtotal - preTaxAmount;
+    const total = discountedSubtotal; // Total remains the same as it already includes tax
+    
+    console.log('Calculated totals:', { subtotal: preTaxAmount, discount: discountAmount, tax, total });
 
-    return { subtotal, discount: discountAmount, tax, total };
+    return { subtotal: preTaxAmount, discount: discountAmount, tax, total };
   };
 
   const createOrder = async (paymentMethod: Order['paymentMethod'] = 'cash', cashAmount?: number, cardAmount?: number) => {

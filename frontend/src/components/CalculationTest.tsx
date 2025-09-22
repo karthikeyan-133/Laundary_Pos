@@ -104,7 +104,8 @@ const CalculationTest: React.FC = () => {
         testResultsArray.push(`❌ Cart subtotal incorrect: expected ${expectedSubtotal}, got ${totals.subtotal}`);
       }
       
-      const expectedTotal = expectedSubtotal + (expectedSubtotal * 0.05); // Assuming 5% tax
+      // For tax-inclusive pricing, total should equal the discounted subtotal
+      const expectedTotal = totals.subtotal + totals.discount; // Pre-tax amount + discount
       if (Math.abs(totals.total - expectedTotal) > 0.01) {
         calculationCorrect = false;
         testResultsArray.push(`❌ Cart total incorrect: expected ${expectedTotal}, got ${totals.total}`);

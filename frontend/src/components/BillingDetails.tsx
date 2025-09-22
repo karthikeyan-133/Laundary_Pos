@@ -60,11 +60,17 @@ export function BillingDetails({ order, onPrint, settings }: BillingDetailsProps
     };
   }) || [];
 
-  // Calculate totals
+  // Calculate totals with tax-inclusive pricing
   const subtotal = itemDetails.reduce((sum, item) => sum + (item.quantity * item.serviceRate), 0);
   const totalDiscount = itemDetails.reduce((sum, item) => sum + (item.quantity * item.serviceRate * item.discount / 100), 0);
-  const taxAmount = (subtotal - totalDiscount) * (settings?.taxRate || 0) / 100;
-  const total = subtotal - totalDiscount + taxAmount;
+  const discountedSubtotal = subtotal - totalDiscount;
+  
+  // Calculate tax and totals for prices that already include tax
+  const taxRate = settings?.taxRate || 0;
+  const taxMultiplier = taxRate / 100;
+  const preTaxAmount = discountedSubtotal / (1 + taxMultiplier);
+  const taxAmount = discountedSubtotal - preTaxAmount;
+  const total = discountedSubtotal; // Total remains the same as it already includes tax
 
   return (
     <Card className="bg-card border-border">

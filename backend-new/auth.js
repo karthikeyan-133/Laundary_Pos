@@ -8,6 +8,24 @@ const router = express.Router();
 // Secret key for JWT (from environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'tally_pos_secret_key';
 
+// Middleware to verify JWT token
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, admin) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.admin = admin;
+    next();
+  });
+};
+
 // Signup endpoint - for initial admin setup
 router.post('/signup', async (req, res) => {
   try {
@@ -109,22 +127,13 @@ router.post('/signin', async (req, res) => {
   }
 });
 
-// Middleware to verify JWT token
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, admin) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-    req.admin = admin;
-    next();
+// Token verification endpoint
+router.post('/verify', authenticateToken, (req, res) => {
+  // If we reach here, the token is valid
+  res.json({
+    message: 'Token is valid',
+    admin: req.admin
   });
-};
+});
 
 module.exports = { router, authenticateToken };

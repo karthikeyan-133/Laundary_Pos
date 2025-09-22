@@ -6,7 +6,11 @@ export function formatCurrency(amount: number, currency: string = 'USD'): string
 }
 
 export function calculateTax(subtotal: number, taxRate: number): number {
-  return subtotal * (taxRate / 100);
+  // For tax-inclusive pricing, calculate the tax portion from the total
+  // If subtotal is 100 (including 5% tax), then tax = 100 - (100 / 1.05) = 4.76
+  const taxMultiplier = taxRate / 100;
+  const preTaxAmount = subtotal / (1 + taxMultiplier);
+  return subtotal - preTaxAmount;
 }
 
 export function calculateDiscount(originalPrice: number, discountPercentage: number): number {

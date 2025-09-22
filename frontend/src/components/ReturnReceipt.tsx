@@ -69,16 +69,22 @@ export const ReturnReceipt = forwardRef<HTMLDivElement, ReturnReceiptProps>(({
     let returnSubtotal = 0;
     let returnTax = 0;
     let returnTotal = 0;
-    
+
     order.items.forEach(item => {
       const returnQuantity = returnItems[item.id] || 0;
       if (returnQuantity > 0) {
         const serviceRate = getServiceRate(item.product, item.service);
         const itemSubtotal = returnQuantity * serviceRate * (1 - item.discount / 100);
-        const itemTax = itemSubtotal * (settings.taxRate / 100);
-        returnSubtotal += itemSubtotal;
+        
+        // Calculate tax and totals for prices that already include tax
+        const taxRate = settings.taxRate || 0;
+        const taxMultiplier = taxRate / 100;
+        const preTaxAmount = itemSubtotal / (1 + taxMultiplier);
+        const itemTax = itemSubtotal - preTaxAmount;
+        
+        returnSubtotal += preTaxAmount;
         returnTax += itemTax;
-        returnTotal += itemSubtotal + itemTax;
+        returnTotal += itemSubtotal; // Total remains the same as it already includes tax
       }
     });
     
