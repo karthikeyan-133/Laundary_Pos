@@ -11,7 +11,7 @@ if (!isVercel) {
 }
 
 console.log('Attempting to connect to MySQL database with the following configuration:');
-console.log('Host:', process.env.DB_HOST || 'localhost');
+console.log('Host:', process.env.DB_HOST || '190.92.174.102'); // Default to IPv4 address
 console.log('User:', process.env.DB_USER || 'root');
 console.log('Database:', process.env.DB_NAME || 'Pos_system');
 console.log('Port:', process.env.DB_PORT || 3306);
@@ -52,17 +52,17 @@ dns.lookup(process.env.DB_HOST || 'localhost', (err, address, family) => {
 
 // Create a connection pool to the database
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || '190.92.174.102', // Default to IPv4 address
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'Pos_system',
   port: process.env.DB_PORT || 3306,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 3, // Reduced from 5 to 3
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 2, // Reduced to 2
   queueLimit: 0,
   // Add connection timeout
-  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 10000, // 10 seconds
-  acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 10000, // 10 seconds
+  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 5000, // 5 seconds
+  acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 5000, // 5 seconds
   // Enable keep-alive
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
