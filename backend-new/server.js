@@ -128,6 +128,29 @@ app.get("/api/cors-check", (req, res) => {
   res.json({ cors: "ok" });
 });
 
+// Add debugging endpoint
+app.get("/api/debug-cors", (req, res) => {
+  const origin = req.get('Origin');
+  const host = req.get('Host');
+  const referer = req.get('Referer');
+  
+  console.log('=== CORS DEBUG INFO ===');
+  console.log('Origin:', origin);
+  console.log('Host:', host);
+  console.log('Referer:', referer);
+  console.log('Request URL:', req.url);
+  console.log('Request Method:', req.method);
+  
+  res.json({ 
+    cors: "debug",
+    origin: origin,
+    host: host,
+    referer: referer,
+    requestUrl: req.url,
+    requestMethod: req.method
+  });
+});
+
 app.get('/health', async (req, res) => {
   try {
     // Test MySQL connection
