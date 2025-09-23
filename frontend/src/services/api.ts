@@ -11,9 +11,10 @@ const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
     // In browser environment
     if (window.location.hostname.includes('vercel.app')) {
-      // For Vercel deployments, we need to use the specific backend URL
-      // since frontend and backend are deployed separately
-      return 'https://laundary-pos-zb3p.vercel.app';
+      // For Vercel deployments with separate frontend and backend,
+      // you need to set VITE_API_URL in your .env file
+      console.warn('VITE_API_URL not set in .env file. API requests may fail.');
+      return '';
     } else if (window.location.hostname.includes('techzontech.com')) {
       // For cPanel deployments, API is at the same domain
       // Use relative path for same-origin requests
