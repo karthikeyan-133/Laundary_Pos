@@ -36,32 +36,30 @@ app.use((req, res, next) => {
   const origin = req.get('Origin');
   console.log('Request received from origin:', origin);
   
-  // List of allowed origins
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:8080',
-    'http://localhost:8081',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    'http://127.0.0.1:8080',
-    'http://127.0.0.1:8081',
-    'https://laundary-pos.vercel.app',
-    'https://laundary-pos-zb3p.vercel.app'
-  ];
-  
-  // Set CORS headers
-  if (origin && allowedOrigins.includes(origin)) {
+  // For production, allow all vercel.app origins to communicate with each other
+  if (origin && origin.endsWith('.vercel.app')) {
     res.header('Access-Control-Allow-Origin', origin);
-  } else if (!origin) {
-    // For requests with no origin (like mobile apps or curl requests)
-    res.header('Access-Control-Allow-Origin', '*');
-  } else {
-    // For production environments, we might want to be more permissive
-    // Check if it's a vercel.app domain
-    if (origin && origin.endsWith('.vercel.app')) {
+  } else if (origin) {
+    // List of allowed origins for development
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:8080',
+      'http://localhost:8081',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
+      'http://127.0.0.1:8080',
+      'http://127.0.0.1:8081',
+      'https://laundary-pos.vercel.app',
+      'https://laundary-pos-zb3p.vercel.app'
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
       res.header('Access-Control-Allow-Origin', origin);
     }
+  } else {
+    // For requests with no origin (like mobile apps or curl requests)
+    res.header('Access-Control-Allow-Origin', '*');
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
