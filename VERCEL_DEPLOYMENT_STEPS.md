@@ -44,7 +44,44 @@
 
 ## Troubleshooting
 
-If you see errors:
-1. Check that VITE_API_URL in frontend/.env points to your deployed backend
-2. Ensure backend environment variables are correctly set in Vercel dashboard
-3. Check Vercel logs for detailed error messages
+### "Failed to load module script" Error
+
+This error occurs when the server returns an HTML page instead of JavaScript files. To fix this:
+
+1. Ensure `frontend/vercel.json` has proper routing configuration:
+   ```json
+   {
+     "routes": [
+       {
+         "src": "/assets/(.*)",
+         "headers": {
+           "cache-control": "public,max-age=31536000,immutable"
+         },
+         "dest": "/assets/$1"
+       },
+       {
+         "src": "/(.*)",
+         "dest": "/index.html"
+       }
+     ]
+   }
+   ```
+
+2. Make sure `vite.config.ts` has `base: '/'` configured
+
+3. Redeploy the frontend after making these changes
+
+### Other Common Issues
+
+1. **CORS Errors**: Ensure backend has proper CORS configuration for your frontend domain
+2. **API Connection Issues**: Verify VITE_API_URL in frontend/.env points to correct backend URL
+3. **Environment Variables**: Check that all required environment variables are set in Vercel dashboard
+4. **Build Failures**: Check Vercel logs for detailed error messages
+
+## Post-Deployment
+
+1. Visit your frontend URL
+2. Log in with default credentials (admin/admin123)
+3. Change the default password immediately
+4. Configure business settings
+5. Add products and customers

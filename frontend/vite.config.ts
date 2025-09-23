@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: '/',
   server: {
     host: "::",
     port: 8080,
@@ -20,6 +21,17 @@ export default defineConfig(({ mode }) => ({
   preview: {
     host: "::",
     port: 8080,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          charts: ['recharts'],
+          pdf: ['jspdf', 'jspdf-autotable']
+        }
+      }
+    }
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
