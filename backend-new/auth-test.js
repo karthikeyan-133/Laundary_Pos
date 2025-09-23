@@ -2,7 +2,7 @@ const axios = require('axios');
 
 // Test the authentication endpoints with settings table
 async function testAuthWithSettings() {
-  const baseURL = 'http://localhost:3005/api/auth';
+  const baseURL = 'http://localhost:3001/api/auth';
   
   try {
     // First, let's check if admin already exists

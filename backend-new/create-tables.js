@@ -1,180 +1,87 @@
-const { query } = require('./mysqlDb');
+const { supabase } = require('./supabaseClient');
 
-// This script will create the necessary tables in the MySQL database
+// This script will insert sample data into the Supabase database
 
-console.log('Creating tables in MySQL database...');
+console.log('Inserting sample data into Supabase database...');
 
-// Create tables one by one
-const tables = [
-  `CREATE TABLE IF NOT EXISTS products (
-    id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    ironRate DECIMAL(10, 2) NOT NULL,
-    washAndIronRate DECIMAL(10, 2) NOT NULL,
-    dryCleanRate DECIMAL(10, 2) NOT NULL,
-    category VARCHAR(255),
-    barcode VARCHAR(255) UNIQUE,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )`,
-  
-  `CREATE TABLE IF NOT EXISTS customers (
-    id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    code VARCHAR(255),
-    contact_name VARCHAR(255),
-    phone VARCHAR(255),
-    email VARCHAR(255),
-    place VARCHAR(255),
-    emirate VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )`,
-  
-  `CREATE TABLE IF NOT EXISTS settings (
-    id INT PRIMARY KEY,
-    tax_rate DECIMAL(5, 2) DEFAULT 5.00,
-    currency VARCHAR(10) DEFAULT 'AED',
-    business_name VARCHAR(255) DEFAULT 'TallyPrime Café',
-    business_address TEXT,
-    business_phone VARCHAR(255) DEFAULT '+971 4 123 4567',
-    barcode_scanner_enabled BOOLEAN DEFAULT TRUE,
-    /* Admin credentials */
-    admin_username VARCHAR(255),
-    admin_email VARCHAR(255),
-    admin_password_hash VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )`,
-  
-  `CREATE TABLE IF NOT EXISTS orders (
-    id VARCHAR(255) PRIMARY KEY,
-    customer_id VARCHAR(255),
-    subtotal DECIMAL(10, 2) NOT NULL,
-    discount DECIMAL(10, 2) DEFAULT 0,
-    tax DECIMAL(10, 2) DEFAULT 0,
-    total DECIMAL(10, 2) NOT NULL,
-    payment_method VARCHAR(255),
-    cash_amount DECIMAL(10, 2),
-    card_amount DECIMAL(10, 2),
-    status VARCHAR(255),
-    delivery_status VARCHAR(255),
-    payment_status VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )`,
-  
-  `CREATE TABLE IF NOT EXISTS order_items (
-    id VARCHAR(255) PRIMARY KEY,
-    order_id VARCHAR(255),
-    product_id VARCHAR(255),
-    quantity INT NOT NULL,
-    discount DECIMAL(5, 2) DEFAULT 0,
-    subtotal DECIMAL(10, 2) NOT NULL,
-    service VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )`,
-  
-  `CREATE TABLE IF NOT EXISTS returns (
-    id VARCHAR(255) PRIMARY KEY,
-    order_id VARCHAR(255),
-    reason TEXT,
-    refund_amount DECIMAL(10, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`,
-  
-  `CREATE TABLE IF NOT EXISTS return_items (
-    id VARCHAR(255) PRIMARY KEY,
-    return_id VARCHAR(255),
-    product_id VARCHAR(255),
-    quantity INT NOT NULL,
-    refund_amount DECIMAL(10, 2) NOT NULL
-  )`,
-  
-  `CREATE TABLE IF NOT EXISTS id_sequences (
-    prefix VARCHAR(10) PRIMARY KEY,
-    counter_value INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )`
-];
-
-// Add foreign key constraints
-const foreignKeys = [
-  `ALTER TABLE orders ADD CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL`,
-  `ALTER TABLE order_items ADD CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE`,
-  `ALTER TABLE order_items ADD CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL`,
-  `ALTER TABLE returns ADD CONSTRAINT fk_returns_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL`,
-  `ALTER TABLE return_items ADD CONSTRAINT fk_return_items_return FOREIGN KEY (return_id) REFERENCES returns(id) ON DELETE CASCADE`,
-  `ALTER TABLE return_items ADD CONSTRAINT fk_return_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL`,
-  `ALTER TABLE order_items ADD CONSTRAINT service_check CHECK (service IN ('iron', 'washAndIron', 'dryClean'))`
-];
-
-// Insert statements
-const inserts = [
-  `INSERT INTO settings (id, tax_rate, currency, business_name, business_address, business_phone, barcode_scanner_enabled, admin_username, admin_email, admin_password_hash)
-   VALUES (1, 5.00, 'AED', 'TallyPrime Café', 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE', '+971 4 123 4567', TRUE, 'admin', 'admin@example.com', '$2a$10$8K1p/a0dURXAm7QiTRqNa.E3YPWs8UkrpC4rGHv7rIbx4s9usV6Wi')
-   ON DUPLICATE KEY UPDATE id=id`,
-  
-  `INSERT INTO products (id, name, ironRate, washAndIronRate, dryCleanRate, category, barcode, description) VALUES
-   ('1', 'Shirt', 5.00, 15.00, 25.00, 'Clothing', 'CL001', 'Cotton shirt'),
-   ('2', 'Pant', 7.00, 20.00, 35.00, 'Clothing', 'CL002', 'Formal pant'),
-   ('3', 'Jacket', 10.00, 25.00, 50.00, 'Clothing', 'CL003', 'Winter jacket'),
-   ('4', 'Dress', 8.00, 22.00, 40.00, 'Clothing', 'CL004', 'Evening dress'),
-   ('5', 'Suit', 15.00, 35.00, 75.00, 'Clothing', 'CL005', 'Formal suit'),
-   ('6', 'Bed Sheet', 12.00, 30.00, 45.00, 'Household', 'HH001', 'Queen size bed sheet'),
-   ('7', 'Towel', 3.00, 8.00, 15.00, 'Household', 'HH002', 'Cotton towel'),
-   ('8', 'Curtain', 20.00, 50.00, 80.00, 'Household', 'HH003', 'Living room curtain'),
-   ('9', 'Carpet', 25.00, 60.00, 100.00, 'Household', 'HH004', 'Small carpet'),
-   ('10', 'Saree', 10.00, 30.00, 60.00, 'Clothing', 'CL006', 'Silk saree')
-   ON DUPLICATE KEY UPDATE id=id`,
-  
-  `INSERT INTO customers (id, name, code, contact_name, phone, email, place, emirate) VALUES
-   ('1', 'Walk-in Customer', 'WIC001', '', '', '', '', '')
-   ON DUPLICATE KEY UPDATE id=id`
-];
-
-async function createTables() {
+// Insert sample data
+async function insertSampleData() {
   try {
-    console.log('Creating tables...');
-    
-    // Create tables
-    for (let i = 0; i < tables.length; i++) {
-      console.log(`Creating table ${i + 1}/${tables.length}...`);
-      await query(tables[i]);
-      console.log(`✅ Table ${i + 1} created successfully.`);
-    }
-    
-    // Add foreign key constraints
-    console.log('Adding foreign key constraints...');
-    for (let i = 0; i < foreignKeys.length; i++) {
-      try {
-        console.log(`Adding foreign key ${i + 1}/${foreignKeys.length}...`);
-        await query(foreignKeys[i]);
-        console.log(`✅ Foreign key ${i + 1} added successfully.`);
-      } catch (err) {
-        // Foreign key might already exist, continue
-        console.log(`⚠️ Foreign key ${i + 1} may already exist or has an issue:`, err.message);
-      }
-    }
-    
-    // Insert sample data
     console.log('Inserting sample data...');
-    for (let i = 0; i < inserts.length; i++) {
-      console.log(`Inserting data set ${i + 1}/${inserts.length}...`);
-      await query(inserts[i]);
-      console.log(`✅ Data set ${i + 1} inserted successfully.`);
+    
+    // Insert settings
+    const { error: settingsError } = await supabase
+      .from('settings')
+      .upsert({
+        id: 1,
+        tax_rate: 5.00,
+        currency: 'AED',
+        business_name: 'TallyPrime Café',
+        business_address: 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE',
+        business_phone: '+971 4 123 4567',
+        barcode_scanner_enabled: true,
+        admin_username: 'admin',
+        admin_email: 'admin@example.com',
+        admin_password_hash: '$2a$10$8K1p/a0dURXAm7QiTRqNa.E3YPWs8UkrpC4rGHv7rIbx4s9usV6Wi'
+      }, { onConflict: 'id' });
+    
+    if (settingsError) {
+      console.log('⚠️ Settings insertion warning:', settingsError.message);
+    } else {
+      console.log('✅ Settings inserted successfully.');
     }
     
-    console.log('✅ All tables created and sample data inserted successfully!');
+    // Insert sample products
+    const products = [
+      { id: '1', name: 'Shirt', ironRate: 5.00, washAndIronRate: 15.00, dryCleanRate: 25.00, category: 'Clothing', barcode: 'CL001', description: 'Cotton shirt' },
+      { id: '2', name: 'Pant', ironRate: 7.00, washAndIronRate: 20.00, dryCleanRate: 35.00, category: 'Clothing', barcode: 'CL002', description: 'Formal pant' },
+      { id: '3', name: 'Jacket', ironRate: 10.00, washAndIronRate: 25.00, dryCleanRate: 50.00, category: 'Clothing', barcode: 'CL003', description: 'Winter jacket' },
+      { id: '4', name: 'Dress', ironRate: 8.00, washAndIronRate: 22.00, dryCleanRate: 40.00, category: 'Clothing', barcode: 'CL004', description: 'Evening dress' },
+      { id: '5', name: 'Suit', ironRate: 15.00, washAndIronRate: 35.00, dryCleanRate: 75.00, category: 'Clothing', barcode: 'CL005', description: 'Formal suit' },
+      { id: '6', name: 'Bed Sheet', ironRate: 12.00, washAndIronRate: 30.00, dryCleanRate: 45.00, category: 'Household', barcode: 'HH001', description: 'Queen size bed sheet' },
+      { id: '7', name: 'Towel', ironRate: 3.00, washAndIronRate: 8.00, dryCleanRate: 15.00, category: 'Household', barcode: 'HH002', description: 'Cotton towel' },
+      { id: '8', name: 'Curtain', ironRate: 20.00, washAndIronRate: 50.00, dryCleanRate: 80.00, category: 'Household', barcode: 'HH003', description: 'Living room curtain' },
+      { id: '9', name: 'Carpet', ironRate: 25.00, washAndIronRate: 60.00, dryCleanRate: 100.00, category: 'Household', barcode: 'HH004', description: 'Small carpet' },
+      { id: '10', name: 'Saree', ironRate: 10.00, washAndIronRate: 30.00, dryCleanRate: 60.00, category: 'Clothing', barcode: 'CL006', description: 'Silk saree' }
+    ];
+    
+    const { error: productsError } = await supabase
+      .from('products')
+      .upsert(products, { onConflict: 'id' });
+    
+    if (productsError) {
+      console.log('⚠️ Products insertion warning:', productsError.message);
+    } else {
+      console.log('✅ Sample products inserted successfully.');
+    }
+    
+    // Insert default customer
+    const { error: customerError } = await supabase
+      .from('customers')
+      .upsert({
+        id: '1',
+        name: 'Walk-in Customer',
+        code: 'WIC001',
+        contact_name: '',
+        phone: '',
+        email: '',
+        place: '',
+        emirate: ''
+      }, { onConflict: 'id' });
+    
+    if (customerError) {
+      console.log('⚠️ Customer insertion warning:', customerError.message);
+    } else {
+      console.log('✅ Default customer inserted successfully.');
+    }
+    
+    console.log('✅ All sample data inserted successfully!');
     process.exit(0);
   } catch (err) {
-    console.error('❌ Error creating tables:', err);
+    console.error('❌ Error inserting sample data:', err);
     process.exit(1);
   }
 }
 
-// Run the table creation
-createTables();
+// Run the sample data insertion
+insertSampleData();

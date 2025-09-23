@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { query } = require('./mysqlDb');
+const { supabase } = require('./supabaseClient');
 
 const router = express.Router();
 
@@ -57,8 +57,18 @@ router.post('/signup', async (req, res) => {
     }
 
     // Check if admin already exists
-    const settings = await query('SELECT admin_username, admin_email FROM settings WHERE id = 1');
-    if (settings.length > 0 && (settings[0].admin_username || settings[0].admin_email)) {
+    const { data: settings, error: selectError } = await supabase
+      .from('settings')
+      .select('admin_username, admin_email')
+      .eq('id', 1)
+      .single();
+    
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('Database error when checking for existing admin:', selectError);
+      throw new Error(`Database error: ${selectError.message}`);
+    }
+    
+    if (settings && (settings.admin_username || settings.admin_email)) {
       return res.status(400).json({ error: 'Admin already exists. Please use signin.' });
     }
 
@@ -66,29 +76,45 @@ router.post('/signup', async (req, res) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Update settings table with admin credentials and business settings
-    await query(
-      `UPDATE settings SET 
-        admin_username = ?, 
-        admin_email = ?, 
-        admin_password_hash = ?,
-        business_name = ?,
-        business_address = ?,
-        business_phone = ?,
-        tax_rate = ?,
-        currency = ?
-      WHERE id = 1`,
-      [
-        username, 
-        email, 
-        passwordHash,
-        business_name || 'TallyPrime Café',
-        business_address || 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE',
-        business_phone || '+971 4 123 4567',
-        tax_rate || 5.00,
-        currency || 'AED'
-      ]
-    );
+    // Prepare settings data
+    const settingsData = {
+      id: 1, // Always use id=1 for the settings record
+      admin_username: username,
+      admin_email: email,
+      admin_password_hash: passwordHash,
+      business_name: business_name || 'TallyPrime Café',
+      business_address: business_address || 'Shop 123, Marina Mall, Dubai Marina, Dubai, UAE',
+      business_phone: business_phone || '+971 4 123 4567',
+      tax_rate: tax_rate !== undefined ? parseFloat(tax_rate) : 5.00,
+      currency: currency || 'AED'
+    };
+
+    // Try to update existing settings or insert new ones
+    let updateResult, updateError;
+    
+    if (settings) {
+      // Settings record exists, update it
+      console.log('Updating existing settings record');
+      ({ data: updateResult, error: updateError } = await supabase
+        .from('settings')
+        .update(settingsData)
+        .eq('id', 1)
+        .select()
+        .single());
+    } else {
+      // No settings record exists, insert new one
+      console.log('Inserting new settings record');
+      ({ data: updateResult, error: updateError } = await supabase
+        .from('settings')
+        .insert([settingsData])
+        .select()
+        .single());
+    }
+    
+    if (updateError) {
+      console.error('Database error when saving settings:', updateError);
+      throw new Error(`Failed to save settings: ${updateError.message}`);
+    }
 
     // Create JWT token
     const token = jwt.sign({ id: 1, username, email }, JWT_SECRET, { expiresIn: '24h' });
@@ -100,7 +126,7 @@ router.post('/signup', async (req, res) => {
     });
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error during signup' });
   }
 });
 
@@ -115,35 +141,43 @@ router.post('/signin', async (req, res) => {
     }
 
     // Find admin in settings table
-    const settings = await query('SELECT admin_username, admin_email, admin_password_hash FROM settings WHERE id = 1');
-    if (settings.length === 0 || !settings[0].admin_username) {
+    const { data: settings, error: selectError } = await supabase
+      .from('settings')
+      .select('admin_username, admin_email, admin_password_hash')
+      .eq('id', 1)
+      .single();
+    
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('Database error when fetching admin:', selectError);
+      throw new Error(`Database error: ${selectError.message}`);
+    }
+    
+    if (!settings || !settings.admin_username) {
       return res.status(401).json({ error: 'Admin not found. Please signup first.' });
     }
 
-    const admin = settings[0];
-
     // Verify username
-    if (admin.admin_username !== username) {
+    if (settings.admin_username !== username) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, admin.admin_password_hash);
+    const isPasswordValid = await bcrypt.compare(password, settings.admin_password_hash);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Create JWT token
-    const token = jwt.sign({ id: 1, username: admin.admin_username, email: admin.admin_email }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: 1, username: settings.admin_username, email: settings.admin_email }, JWT_SECRET, { expiresIn: '24h' });
 
     res.json({
       message: 'Signin successful',
       token,
-      admin: { id: 1, username: admin.admin_username, email: admin.admin_email }
+      admin: { id: 1, username: settings.admin_username, email: settings.admin_email }
     });
   } catch (error) {
     console.error('Signin error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error during signin' });
   }
 });
 

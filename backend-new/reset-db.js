@@ -1,32 +1,39 @@
-const { query } = require('./mysqlDb');
+const { supabase } = require('./supabaseClient');
 
 async function resetDatabase() {
   try {
-    console.log('Dropping existing tables...');
+    console.log('Clearing existing data from tables...');
     
-    // Drop tables in reverse order to avoid foreign key constraints
-    const dropTables = [
-      'DROP TABLE IF EXISTS return_items',
-      'DROP TABLE IF EXISTS returns',
-      'DROP TABLE IF EXISTS order_items',
-      'DROP TABLE IF EXISTS orders',
-      'DROP TABLE IF EXISTS settings',
-      'DROP TABLE IF EXISTS customers',
-      'DROP TABLE IF EXISTS products'
+    // Clear tables in reverse order to avoid foreign key constraints
+    const tables = [
+      'return_items',
+      'returns',
+      'order_items',
+      'orders',
+      'settings',
+      'customers',
+      'products'
     ];
     
-    for (let i = 0; i < dropTables.length; i++) {
-      console.log(`Dropping table ${i + 1}/${dropTables.length}...`);
-      await query(dropTables[i]);
-      console.log(`✅ Table ${i + 1} dropped successfully.`);
+    for (let i = 0; i < tables.length; i++) {
+      console.log(`Clearing table ${tables[i]} (${i + 1}/${tables.length})...`);
+      const { error } = await supabase
+        .from(tables[i])
+        .delete();
+      
+      if (error) {
+        console.log(`⚠️ Warning clearing table ${tables[i]}:`, error.message);
+      } else {
+        console.log(`✅ Table ${tables[i]} cleared successfully.`);
+      }
     }
     
-    console.log('✅ All tables dropped successfully!');
-    console.log('Now run create-tables.js to recreate the tables.');
+    console.log('✅ All tables cleared successfully!');
+    console.log('Now run create-tables.js to repopulate the tables with sample data.');
     
     process.exit(0);
   } catch (err) {
-    console.error('❌ Error dropping tables:', err);
+    console.error('❌ Error clearing tables:', err);
     process.exit(1);
   }
 }

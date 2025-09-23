@@ -20,12 +20,12 @@ const getApiBaseUrl = () => {
       // Use relative path for same-origin requests
       return '';
     } else {
-      // For local development - use localhost:3005 (updated from 3004)
-      return 'http://localhost:3005';
+      // For local development - use localhost:3001 (updated from 3005)
+      return 'http://localhost:3001';
     }
   }
   // For server-side rendering, fallback to localhost
-  return 'http://localhost:3005';
+  return 'http://localhost:3001';
 };
 
 const API_BASE_URL = getApiBaseUrl();

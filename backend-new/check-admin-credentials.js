@@ -1,16 +1,24 @@
-const { query } = require('./mysqlDb');
+const { supabase } = require('./supabaseClient');
 
 async function checkAdminCredentials() {
   try {
     console.log('Checking admin credentials in the database...');
     
-    const result = await query('SELECT admin_username, admin_email, admin_password_hash FROM settings WHERE id = 1');
+    const { data: result, error } = await supabase
+      .from('settings')
+      .select('admin_username, admin_email, admin_password_hash')
+      .eq('id', 1)
+      .single();
     
-    if (result.length > 0) {
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(error.message);
+    }
+    
+    if (result) {
       console.log('Admin credentials found:');
-      console.log('Username:', result[0].admin_username);
-      console.log('Email:', result[0].admin_email);
-      console.log('Password hash:', result[0].admin_password_hash);
+      console.log('Username:', result.admin_username);
+      console.log('Email:', result.admin_email);
+      console.log('Password hash:', result.admin_password_hash);
     } else {
       console.log('No admin credentials found in the settings table.');
     }

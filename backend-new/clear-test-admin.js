@@ -1,8 +1,8 @@
 const { supabase } = require('./supabaseClient');
 
-async function clearAdmin() {
+async function clearTestAdmin() {
   try {
-    console.log('Clearing admin credentials from the settings table...');
+    console.log('Clearing test admin credentials...');
     
     // Clear the admin credentials in the settings table
     const { data, error } = await supabase
@@ -19,11 +19,11 @@ async function clearAdmin() {
       throw new Error(error.message);
     }
     
-    console.log('✅ Admin credentials cleared successfully!');
-    console.log('You can now signup with new admin credentials.');
+    console.log('✅ Test admin credentials cleared successfully!');
+    console.log('You can now signup with your own admin credentials through the signup page.');
   } catch (error) {
-    console.error('Error clearing admin credentials:', error);
+    console.error('Error clearing test admin credentials:', error);
   }
 }
 
-clearAdmin();
+clearTestAdmin();

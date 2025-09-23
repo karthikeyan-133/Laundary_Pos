@@ -1,16 +1,14 @@
-// Simple script to test database connection in Vercel environment
-console.log('Testing database connection in Vercel environment...');
+// Simple script to test Supabase connection in Vercel environment
+console.log('Testing Supabase connection in Vercel environment...');
 
 // Log environment variables (without sensitive data)
 console.log('Environment variables:');
-console.log('DB_HOST:', process.env.DB_HOST ? 'SET' : 'NOT SET');
-console.log('DB_USER:', process.env.DB_USER ? 'SET' : 'NOT SET');
-console.log('DB_NAME:', process.env.DB_NAME ? 'SET' : 'NOT SET');
-console.log('DB_PORT:', process.env.DB_PORT || 'NOT SET');
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'SET' : 'NOT SET');
+console.log('SUPABASE_KEY:', process.env.SUPABASE_KEY ? 'SET' : 'NOT SET');
 console.log('VERCEL:', process.env.VERCEL ? 'YES' : 'NO');
 
 // Check if required environment variables are set
-const requiredEnvVars = ['DB_HOST', 'DB_USER', 'DB_NAME'];
+const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_KEY'];
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
@@ -20,23 +18,31 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-// Try to import and test the database connection
+// Try to import and test the Supabase connection
 try {
-  console.log('Attempting to import mysqlDb...');
-  const db = require('./mysqlDb');
+  console.log('Attempting to import supabaseClient...');
+  const { supabase } = require('./supabaseClient');
   
-  console.log('mysqlDb imported successfully');
+  console.log('supabaseClient imported successfully');
   
   // Test the connection
   async function testConnection() {
     try {
-      console.log('Testing database connection...');
-      const result = await db.query('SELECT 1 as connected');
-      console.log('✅ Database connection successful!');
-      console.log('Result:', result);
+      console.log('Testing Supabase connection...');
+      const { data, error } = await supabase
+        .from('settings')
+        .select('id')
+        .limit(1);
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      console.log('✅ Supabase connection successful!');
+      console.log('Result:', data);
       process.exit(0);
     } catch (err) {
-      console.error('❌ Database connection failed:');
+      console.error('❌ Supabase connection failed:');
       console.error('Error:', err.message);
       console.error('Stack:', err.stack);
       process.exit(1);
@@ -45,7 +51,7 @@ try {
   
   testConnection();
 } catch (err) {
-  console.error('❌ Failed to import mysqlDb:');
+  console.error('❌ Failed to import supabaseClient:');
   console.error('Error:', err.message);
   console.error('Stack:', err.stack);
   process.exit(1);

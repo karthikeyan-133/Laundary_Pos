@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function testAuthEndpoints() {
-  const baseURL = 'http://localhost:3005/api/auth';
+  const baseURL = 'http://localhost:3001/api/auth';
   
   try {
     console.log('Testing signin with new admin credentials...');

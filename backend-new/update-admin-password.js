@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { query } = require('./mysqlDb');
+const { supabase } = require('./supabaseClient');
 
 async function updateAdminPassword() {
   try {
@@ -11,10 +11,15 @@ async function updateAdminPassword() {
     console.log('New hash for "admin123":', hashedPassword);
     
     // Update the admin password in the database
-    await query(
-      'UPDATE settings SET admin_password_hash = ? WHERE id = 1',
-      [hashedPassword]
-    );
+    const { data, error } = await supabase
+      .from('settings')
+      .update({ admin_password_hash: hashedPassword })
+      .eq('id', 1)
+      .select();
+    
+    if (error) {
+      throw new Error(error.message);
+    }
     
     console.log('✅ Admin password updated successfully!');
   } catch (error) {

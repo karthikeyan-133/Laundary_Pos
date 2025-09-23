@@ -1,23 +1,29 @@
-const { query } = require('./mysqlDb');
+const { supabase } = require('./supabaseClient');
 
 async function resetSettings() {
   try {
     console.log('Resetting all settings table data to initial state...');
     
     // Reset all settings to NULL/empty values except for the id
-    await query(
-      `UPDATE settings SET 
-        tax_rate = NULL,
-        currency = NULL,
-        business_name = NULL,
-        business_address = NULL,
-        business_phone = NULL,
-        barcode_scanner_enabled = NULL,
-        admin_username = NULL,
-        admin_email = NULL,
-        admin_password_hash = NULL
-      WHERE id = 1`
-    );
+    const { data, error } = await supabase
+      .from('settings')
+      .update({
+        tax_rate: null,
+        currency: null,
+        business_name: null,
+        business_address: null,
+        business_phone: null,
+        barcode_scanner_enabled: null,
+        admin_username: null,
+        admin_email: null,
+        admin_password_hash: null
+      })
+      .eq('id', 1)
+      .select();
+    
+    if (error) {
+      throw new Error(error.message);
+    }
     
     console.log('✅ Settings table reset successfully!');
     console.log('All business details and admin credentials have been cleared.');

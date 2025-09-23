@@ -1,5 +1,5 @@
 const express = require('express');
-const db = require('./mysqlDb');
+const { supabase } = require('./supabaseClient');
 const { generateSequentialId } = require('./utils/idGenerator');
 
 const router = express.Router();
@@ -46,7 +46,20 @@ router.post('/', async (req, res) => {
   
   try {
     // Generate a sequential return ID with R prefix
-    const id = await generateSequentialId('R', 5, db);
+    const id = await generateSequentialId('R', 5, {
+      query: async (query, params) => {
+        const { data, error } = await supabase
+          .from('returns')
+          .select('id')
+          .eq('id', params[0]);
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        return data;
+      }
+    });
     console.log('Generated return ID:', id);
     
     // Insert return record
@@ -55,13 +68,18 @@ router.post('/', async (req, res) => {
       order_id,
       reason: reason || '',
       refund_amount,
-      created_at: new Date().toISOString().slice(0, 19).replace('T', ' ') // Format for MySQL DATETIME
+      created_at: new Date().toISOString()
     };
     
-    const result = await db.query(
-      'INSERT INTO returns (id, order_id, reason, refund_amount, created_at) VALUES (?, ?, ?, ?, ?)',
-      [returnData.id, returnData.order_id, returnData.reason, returnData.refund_amount, returnData.created_at]
-    );
+    const { data: returnResult, error: returnError } = await supabase
+      .from('returns')
+      .insert([returnData])
+      .select()
+      .single();
+    
+    if (returnError) {
+      throw new Error(returnError.message);
+    }
     
     console.log('Return record created:', returnData);
     
@@ -69,7 +87,20 @@ router.post('/', async (req, res) => {
     if (items && items.length > 0) {
       const returnItems = await Promise.all(items.map(async (item) => {
         // Generate a sequential ID for return items with RI prefix
-        const itemId = await generateSequentialId('RI', 6, db);
+        const itemId = await generateSequentialId('RI', 6, {
+          query: async (query, params) => {
+            const { data, error } = await supabase
+              .from('return_items')
+              .select('id')
+              .eq('id', params[0]);
+            
+            if (error) {
+              throw new Error(error.message);
+            }
+            
+            return data;
+          }
+        });
         return {
           id: itemId,
           return_id: id,
@@ -82,33 +113,38 @@ router.post('/', async (req, res) => {
       console.log('Creating return items:', returnItems);
       
       // Insert all return items
-      for (const item of returnItems) {
+      const { error: itemsError } = await supabase
+        .from('return_items')
+        .insert(returnItems);
+      
+      if (itemsError) {
+        console.error('Error creating return items:', itemsError);
+        // Try to delete the return record if items creation failed
         try {
-          await db.query(
-            'INSERT INTO return_items (id, return_id, product_id, quantity, refund_amount) VALUES (?, ?, ?, ?, ?)',
-            [item.id, item.return_id, item.product_id, item.quantity, item.refund_amount]
-          );
-        } catch (itemError) {
-          console.error('Error creating return item:', itemError);
-          // Try to delete the return record if items creation failed
-          try {
-            await db.query('DELETE FROM returns WHERE id = ?', [id]);
-          } catch (deleteError) {
-            console.error('Error deleting return record after items creation failed:', deleteError);
-          }
-          return res.status(500).json({ error: 'Failed to create return items: ' + itemError.message });
+          await supabase
+            .from('returns')
+            .delete()
+            .eq('id', id);
+        } catch (deleteError) {
+          console.error('Error deleting return record after items creation failed:', deleteError);
         }
+        return res.status(500).json({ error: 'Failed to create return items: ' + itemsError.message });
       }
     }
     
     // Update order status to "returned" to indicate it has been returned
     try {
-      const updateResult = await db.query(
-        'UPDATE orders SET status = ? WHERE id = ?',
-        ['returned', order_id]
-      );
+      const { data: updateResult, error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'returned' })
+        .eq('id', order_id)
+        .select();
       
-      console.log('Order status updated, affected rows:', updateResult.affectedRows);
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+      
+      console.log('Order status updated');
     } catch (err) {
       console.error('Error updating order status:', err);
       return res.status(500).json({ error: 'Failed to update order status: ' + err.message });
@@ -126,45 +162,59 @@ router.get('/', async (req, res) => {
   console.log('GET /api/returns called with query params:', req.query);
   try {
     // Get returns with related data
-    let query = 'SELECT * FROM returns ORDER BY created_at DESC';
-    let queryParams = [];
+    let query = supabase
+      .from('returns')
+      .select('*')
+      .order('created_at', { ascending: false });
     
     // Apply date filtering if provided
     const { from_date, to_date } = req.query;
     
-    if (from_date || to_date) {
-      query = 'SELECT * FROM returns WHERE created_at >= ? AND created_at <= ? ORDER BY created_at DESC';
-      
-      // Set time ranges
-      const fromDate = from_date ? new Date(from_date) : new Date(0);
-      fromDate.setHours(0, 0, 0, 0);
-      
-      const toDate = to_date ? new Date(to_date) : new Date();
-      toDate.setHours(23, 59, 59, 999);
-      
-      queryParams = [fromDate.toISOString(), toDate.toISOString()];
+    if (from_date) {
+      query = query.gte('created_at', new Date(from_date).toISOString());
     }
     
-    const returns = await db.query(query, queryParams);
+    if (to_date) {
+      const toDate = new Date(to_date);
+      toDate.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', toDate.toISOString());
+    }
+    
+    const { data: returns, error: returnsError } = await query;
+    
+    if (returnsError) {
+      throw new Error(returnsError.message);
+    }
     
     // For each return, get its items with product information
     const returnsWithItems = await Promise.all(returns.map(async (returnRecord) => {
       try {
         // Get return items with product information
-        const items = await db.query(`
-          SELECT ri.*, p.name as product_name, p.barcode, p.ironRate, p.washAndIronRate, p.dryCleanRate
-          FROM return_items ri
-          LEFT JOIN products p ON ri.product_id = p.id
-          WHERE ri.return_id = ?
-        `, [returnRecord.id]);
+        const { data: items, error: itemsError } = await supabase
+          .from('return_items')
+          .select(`
+            *,
+            products(name, barcode, ironRate, washAndIronRate, dryCleanRate)
+          `)
+          .eq('return_id', returnRecord.id);
+        
+        if (itemsError) {
+          throw new Error(itemsError.message);
+        }
         
         // Get customer information through order
-        const orderCustomer = await db.query(`
-          SELECT o.id, c.name as customer_name
-          FROM orders o
-          LEFT JOIN customers c ON o.customer_id = c.id
-          WHERE o.id = ?
-        `, [returnRecord.order_id]);
+        const { data: orderCustomer, error: orderError } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            customers(name)
+          `)
+          .eq('id', returnRecord.order_id)
+          .single();
+        
+        if (orderError && orderError.code !== 'PGRST116') {
+          throw new Error(orderError.message);
+        }
         
         // Convert numeric fields to proper JavaScript numbers
         const convertedReturnRecord = {
@@ -177,15 +227,20 @@ router.get('/', async (req, res) => {
           ...item,
           quantity: Number(item.quantity) || 0,
           refund_amount: Number(item.refund_amount) || 0,
-          ironRate: item.ironRate ? Number(item.ironRate) : undefined,
-          washAndIronRate: item.washAndIronRate ? Number(item.washAndIronRate) : undefined,
-          dryCleanRate: item.dryCleanRate ? Number(item.dryCleanRate) : undefined
+          ironRate: item.products?.ironRate ? Number(item.products.ironRate) : undefined,
+          washAndIronRate: item.products?.washAndIronRate ? Number(item.products.washAndIronRate) : undefined,
+          dryCleanRate: item.products?.dryCleanRate ? Number(item.products.dryCleanRate) : undefined,
+          product_name: item.products?.name || undefined,
+          barcode: item.products?.barcode || undefined
         }));
         
         return {
           ...convertedReturnRecord,
           return_items: convertedItems,
-          orders: orderCustomer.length > 0 ? orderCustomer[0] : null
+          orders: orderCustomer ? { 
+            id: orderCustomer.id, 
+            customer_name: orderCustomer.customers?.name || null 
+          } : null
         };
       } catch (err) {
         console.error('Error processing return record:', err);
@@ -214,10 +269,22 @@ router.delete('/clear', async (req, res) => {
   console.log('DELETE /api/returns/clear called');
   try {
     // First delete all return items
-    const itemsResult = await db.query('DELETE FROM return_items');
+    const { error: itemsError } = await supabase
+      .from('return_items')
+      .delete();
+    
+    if (itemsError) {
+      throw new Error(itemsError.message);
+    }
     
     // Then delete all returns
-    const returnsResult = await db.query('DELETE FROM returns');
+    const { error: returnsError } = await supabase
+      .from('returns')
+      .delete();
+    
+    if (returnsError) {
+      throw new Error(returnsError.message);
+    }
     
     console.log('All returns cleared successfully');
     res.json({ message: 'All returns cleared successfully' });

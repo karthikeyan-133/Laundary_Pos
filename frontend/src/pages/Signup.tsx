@@ -38,7 +38,7 @@ const Signup = () => {
 
     try {
       // Combine admin credentials and business settings in a single request
-      const response = await fetch('http://localhost:3005/api/auth/signup', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

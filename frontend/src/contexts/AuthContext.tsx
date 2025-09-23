@@ -17,6 +17,29 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Determine auth API URL based on environment
+const getAuthApiUrl = () => {
+  // Check for environment variable first
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  }
+  
+  // For Vercel deployments, API is at the same domain
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname.includes('vercel.app')) {
+      return '';
+    } else if (window.location.hostname.includes('techzontech.com')) {
+      return '';
+    } else {
+      // For local development - use localhost:3001 (updated from 3005)
+      return 'http://localhost:3001';
+    }
+  }
+  return 'http://localhost:3001';
+};
+
+const AUTH_API_BASE_URL = getAuthApiUrl();
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [admin, setAdmin] = useState<Admin | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -27,8 +50,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const storedToken = localStorage.getItem('adminToken');
       if (storedToken) {
         try {
+          // Construct the verification URL
+          const verifyUrl = AUTH_API_BASE_URL ? 
+            `${AUTH_API_BASE_URL}/api/auth/verify` : 
+            '/api/auth/verify';
+          
           // Verify token with backend
-          const response = await fetch('http://localhost:3005/api/auth/verify', {
+          const response = await fetch(verifyUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
