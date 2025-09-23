@@ -81,20 +81,7 @@ app.use((req, res, next) => {
 // Apply express.json middleware
 app.use(express.json({ limit: '10mb' }));
 
-// Handle preflight requests for all routes
-app.options('*', (req, res) => {
-  console.log('Global OPTIONS request received');
-  const origin = req.get('Origin');
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Auth-Token');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.status(200).end();
-});
-
-// Special CORS middleware for API routes
+// Special CORS middleware for API routes - ensure it's applied before any other middleware
 app.use('/api/*', (req, res, next) => {
   const origin = req.get('Origin');
   if (origin) {
@@ -102,6 +89,12 @@ app.use('/api/*', (req, res, next) => {
   }
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Auth-Token');
   res.header('Access-Control-Allow-Credentials', 'true');
+  // Handle OPTIONS requests specifically for API routes
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.status(200).end();
+    return;
+  }
   next();
 });
 
@@ -110,15 +103,7 @@ app.use('/api/returns', returnsRouter);
 console.log('Returns router mounted at /api/returns');
 
 // Use auth router with CORS headers
-app.use('/api/auth', (req, res, next) => {
-  const origin = req.get('Origin');
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Auth-Token');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  next();
-}, authRouter);
+app.use('/api/auth', authRouter);
 console.log('Auth router mounted at /api/auth');
 
 // Routes

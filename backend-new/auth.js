@@ -10,6 +10,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'tally_pos_secret_key';
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
+  // Handle OPTIONS requests - don't require authentication for preflight
+  if (req.method === 'OPTIONS') {
+    const origin = req.get('Origin');
+    if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Auth-Token');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    return res.status(200).end();
+  }
+  
   // Set CORS headers for authentication responses
   const origin = req.get('Origin');
   if (origin) {
