@@ -1,71 +1,58 @@
-const { generateSequentialId } = require('./utils/idGenerator');
 const { supabase } = require('./supabaseClient');
+const { generateSequentialId } = require('./utils/idGenerator');
 
 async function testIdGeneration() {
+  console.log('Testing ID generation...');
+  
   try {
-    console.log('Testing sequential ID generation...');
-    
-    // Create a mock db object that works with Supabase
-    const supabaseDb = {
+    // Test generating a TRX ID
+    const orderId = await generateSequentialId('TRX', 6, {
       query: async (query, params) => {
-        // Extract table name from query (simplified for this test)
-        if (query.includes('orders')) {
-          const { data, error } = await supabase
-            .from('orders')
-            .select('id')
-            .eq('id', params[0]);
-          
-          if (error) {
-            throw new Error(error.message);
-          }
-          
-          return data;
-        } else if (query.includes('customers')) {
-          const { data, error } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('id', params[0]);
-          
-          if (error) {
-            throw new Error(error.message);
-          }
-          
-          return data;
-        } else if (query.includes('returns')) {
-          const { data, error } = await supabase
-            .from('returns')
-            .select('id')
-            .eq('id', params[0]);
-          
-          if (error) {
-            throw new Error(error.message);
-          }
-          
-          return data;
+        console.log('Querying id_sequences with params:', params);
+        const { data, error } = await supabase
+          .from('id_sequences')
+          .select('counter_value')
+          .eq('prefix', params[0]);
+        
+        if (error) {
+          throw new Error(error.message);
         }
-        return [];
+        
+        console.log('Query result:', data);
+        return data;
       }
-    };
+    });
     
-    // Test generating a few IDs
-    const id1 = await generateSequentialId('TRX', 6, supabaseDb);
-    console.log('Generated ID 1:', id1);
+    console.log('Generated order ID:', orderId);
     
-    const id2 = await generateSequentialId('TRX', 6, supabaseDb);
-    console.log('Generated ID 2:', id2);
+    // Check if this ID already exists in orders
+    const { data: existingOrder, error: checkError } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('id', orderId);
     
-    const id3 = await generateSequentialId('C', 5, supabaseDb);
-    console.log('Generated Customer ID:', id3);
+    if (checkError) {
+      console.error('Error checking if order exists:', checkError.message);
+      throw checkError;
+    }
     
-    const id4 = await generateSequentialId('R', 5, supabaseDb);
-    console.log('Generated Return ID:', id4);
+    console.log('Order with this ID exists:', existingOrder && existingOrder.length > 0);
     
-    console.log('ID generation test completed successfully!');
-    process.exit(0);
+    if (existingOrder && existingOrder.length > 0) {
+      console.log('ERROR: Generated ID already exists!');
+      return false;
+    } else {
+      console.log('SUCCESS: Generated ID is unique');
+      return true;
+    }
   } catch (error) {
-    console.error('Error testing ID generation:', error);
-    process.exit(1);
+    console.error('Error in ID generation test:', error.message);
+    return false;
   }
 }
 
-testIdGeneration();
+// Run the test
+testIdGeneration().then(success => {
+  console.log('Test result:', success ? 'PASSED' : 'FAILED');
+  process.exit(success ? 0 : 1);
+});
