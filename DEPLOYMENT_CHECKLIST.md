@@ -1,126 +1,107 @@
-# Deployment Checklist
+# Tally POS System - Vercel Deployment Checklist
 
-Follow this checklist to ensure your Tally POS application is properly deployed to Vercel without CORS issues.
+## Prerequisites
+- [ ] Ensure all environment variables are set in Vercel dashboard
+- [ ] Verify database connection settings for cPanel hosting
+- [ ] Confirm CORS configuration allows frontend domain
 
-## Pre-deployment Checks
+## Backend Deployment (laundary-pos-zb3p.vercel.app)
 
-### Frontend Configuration
-- [ ] `.env.production` file exists in `frontend/` directory
-- [ ] `VITE_API_URL` in `.env.production` is empty (not set to a specific URL)
-- [ ] `api.ts` file uses `window.location.origin` for Vercel deployments
-- [ ] Frontend builds successfully with `npm run build`
+### Environment Variables
+- [ ] DB_HOST=localhost (for cPanel)
+- [ ] DB_USER=Pos_User
+- [ ] DB_PASSWORD=Welc0me$27
+- [ ] DB_NAME=Pos_system
+- [ ] DB_PORT=3306
+- [ ] JWT_SECRET=tally_pos_jwt_secret_key_2025
 
-### Backend Configuration
-- [ ] `server.js` has proper CORS middleware that allows vercel.app origins
-- [ ] Backend builds without errors
-- [ ] Database credentials are correct in `backend-new/.env`
+### CORS Configuration
+- [ ] Allowed origins include:
+  - https://laundary-pos.vercel.app (frontend)
+  - https://laundary-pos-zb3p.vercel.app (backend)
+  - http://localhost:5173 (local development)
 
-### Vercel Configuration
-- [ ] `vercel.json` file exists in root directory
-- [ ] `vercel.json` has correct build configurations for both frontend and backend
-- [ ] `vercel.json` includes proper routing for API endpoints
-- [ ] `vercel.json` includes CORS headers for API routes
+## Frontend Deployment (laundary-pos.vercel.app)
 
-## Deployment Steps
+### Environment Variables
+- [ ] VITE_API_URL=https://laundary-pos-zb3p.vercel.app
 
-### 1. Commit Changes
-- [ ] Add all changes: `git add .`
-- [ ] Commit changes: `git commit -m "Fix CORS configuration for Vercel deployment"`
-- [ ] Push to repository: `git push origin main`
+### Build Settings
+- [ ] Build Command: `npm run build`
+- [ ] Output Directory: `dist`
+- [ ] Install Command: `npm install`
 
-### 2. Vercel Deployment
-- [ ] Go to Vercel dashboard
-- [ ] Trigger deployment manually or wait for automatic deployment
-- [ ] Monitor deployment logs for any errors
+## Database Setup
 
-### 3. Post-deployment Verification
-- [ ] Visit deployed application URL
-- [ ] Check browser console for any CORS errors
-- [ ] Test API endpoints:
-  - [ ] `/api/health`
-  - [ ] `/api/test-server`
-  - [ ] `/api/products` (requires authentication)
-- [ ] Test authentication flow
-- [ ] Test CRUD operations
+### Tables Creation
+1. [ ] Run create_tables.sql script in phpMyAdmin
+2. [ ] Verify all tables are created:
+   - products
+   - customers
+   - orders
+   - order_items
+   - returns
+   - return_items
+   - settings
+   - id_sequences
 
-## Common Issues and Solutions
+### Sample Data
+- [ ] Verify sample products are inserted
+- [ ] Verify default settings are inserted
+- [ ] Verify walk-in customer is created
 
-### CORS Errors
-If you still see CORS errors after deployment:
+## Testing After Deployment
 
-1. Verify that `VITE_API_URL` is empty in `.env.production`
-2. Check that the frontend and backend are deployed in the same Vercel project
-3. Ensure the backend CORS middleware allows the frontend origin
-4. Redeploy the application to ensure changes are applied
+### API Endpoints
+- [ ] https://laundary-pos-zb3p.vercel.app/api/test-server (should return success)
+- [ ] https://laundary-pos-zb3p.vercel.app/api/products (should return products)
+- [ ] https://laundary-pos-zb3p.vercel.app/api/customers (should return customers)
+- [ ] https://laundary-pos-zb3p.vercel.app/api/settings (should return settings)
 
-### Database Connection Issues
-If the application can't connect to the database:
+### Frontend Functionality
+- [ ] Login page should work
+- [ ] Dashboard should load data
+- [ ] Product management should work
+- [ ] Order creation should work
+- [ ] Return processing should work
+- [ ] Reports should display correctly
 
-1. Verify database credentials in `backend-new/.env`
-2. Ensure Remote MySQL is enabled in cPanel
-3. Check that your IP is whitelisted in cPanel's Remote MySQL settings
-4. Test database connection locally with `npm run test-db`
+## Troubleshooting
 
-### API Endpoint Issues
-If API endpoints return 404 errors:
+### Common Issues
+1. **CORS Errors**:
+   - Check that frontend domain is in allowed origins
+   - Verify VITE_API_URL is set correctly
+   - Ensure credentials are included in requests
 
-1. Check `vercel.json` routing configuration
-2. Verify that API routes are correctly mapped to the backend server
-3. Ensure the backend server is properly exported for Vercel
+2. **Database Connection Errors**:
+   - Verify DB_HOST is set to localhost for cPanel
+   - Check database credentials
+   - Confirm database and tables exist
 
-## Environment Variables
+3. **API Route Issues**:
+   - Check vercel.json routing configuration
+   - Verify server.js exports the app correctly
+   - Ensure all required dependencies are in package.json
 
-### Required Frontend Variables
-```env
-# For Vercel deployments, leave empty to use same origin
-VITE_API_URL=
-```
-
-### Required Backend Variables
-```env
-# Database Configuration for cPanel
-DB_HOST=your-host.com
-DB_USER=your-username
-DB_PASSWORD=your-password
-DB_NAME=your-database-name
-DB_PORT=3306
-DB_SSL=false
-
-# JWT Secret
-JWT_SECRET=your-jwt-secret
-```
-
-## Testing Commands
-
-### Local Testing
+### Useful Commands
 ```bash
-# Test CORS configuration locally
-cd backend-new
-npm run test-cors
-
-# Test database connection
-cd backend-new
+# Test database connection locally
 npm run test-db
-```
 
-### Build Commands
-```bash
+# Test database connection for Vercel environment
+npm run test-db-vercel
+
+# Run development server locally
+npm run dev
+
 # Build frontend
-cd frontend
-npm run build
-
-# Build backend (Vercel does this automatically)
-cd backend-new
-npm start
+cd frontend && npm run build
 ```
 
-## Verification URLs
+## Post-Deployment Verification
 
-After deployment, test these URLs:
-
-1. **Main Application**: `https://your-app.vercel.app`
-2. **Health Check**: `https://your-app.vercel.app/api/health`
-3. **CORS Check**: `https://your-app.vercel.app/api/cors-check`
-4. **Server Test**: `https://your-app.vercel.app/api/test-server`
-
-If all items in this checklist are completed and verified, your application should be deployed successfully without CORS issues.
+- [ ] Verify health check endpoint: https://laundary-pos-zb3p.vercel.app/health
+- [ ] Test CORS with: https://laundary-pos-zb3p.vercel.app/api/cors-check
+- [ ] Confirm admin login works with default credentials
+- [ ] Verify all CRUD operations for products, customers, and orders

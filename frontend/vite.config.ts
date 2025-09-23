@@ -19,6 +19,4 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Add base configuration for Vercel deployments
-  base: mode === "production" ? "./" : "/",
 }));

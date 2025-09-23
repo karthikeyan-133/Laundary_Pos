@@ -11,16 +11,16 @@ const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
     // In browser environment
     if (window.location.hostname.includes('vercel.app')) {
-      // For Vercel deployments, we use the same domain for both frontend and backend
-      // This avoids CORS issues when frontend and backend are deployed together
-      return window.location.origin;
+      // For Vercel deployments, we need to use the specific backend URL
+      // since frontend and backend are deployed separately
+      return 'https://laundary-pos-zb3p.vercel.app';
     } else {
-      // For local development - use localhost:3001 (your backend port)
-      return 'http://localhost:3001';
+      // For local development - use localhost:3005 (updated from 3004)
+      return 'http://localhost:3005';
     }
   }
   // For server-side rendering, fallback to localhost
-  return 'http://localhost:3001';
+  return 'http://localhost:3005';
 };
 
 const API_BASE_URL = getApiBaseUrl();

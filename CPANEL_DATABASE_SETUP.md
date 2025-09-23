@@ -1,108 +1,121 @@
-# cPanel Database Setup for Tally POS
+# cPanel Database Setup Guide
 
-This guide will help you configure the Tally POS system to use a cPanel MySQL database instead of a local MySQL installation.
+This guide will help you set up your MySQL database on cPanel for the Tally POS system.
 
 ## Prerequisites
 
-1. cPanel hosting account with MySQL database access
-2. Remote MySQL access enabled in cPanel
-3. Your IP address whitelisted in cPanel's remote MySQL settings
+1. cPanel hosting account
+2. Access to cPanel control panel
+3. The following information from your [.env](file:///C:/Users/TECHZON-17/Desktop/Tally_Pos/backend-new/.env) file:
+   - Database name: `techzontech_Laundry_Pos`
+   - Database user: `techzontech_Pos_user`
+   - Database password: `Welc0me$27`
+   - Host: `techzontech.com`
 
-## Step 1: Create Database and User in cPanel
+## Step-by-Step Setup
 
-1. Log in to your cPanel
-2. Navigate to the "MySQL Databases" section
-3. Create a new database named `Pos_system` (or your preferred name)
-4. Create a new database user with a strong password
-5. Assign the user to the database with ALL PRIVILEGES
-6. Note down the following information:
-   - Database name
-   - Database username
-   - Database password
-   - Database host (usually your domain name or a specific host provided by your host)
+### 1. Log into cPanel
 
-## Step 2: Enable Remote MySQL Access
+1. Go to your cPanel login URL (usually `https://yourdomain.com/cpanel` or provided by your host)
+2. Enter your cPanel username and password
 
-1. In cPanel, find the "Remote MySQL" section
-2. Add your development machine's IP address to the whitelist
-3. If deploying to Vercel, you may need to contact your hosting provider to enable remote access
+### 2. Create MySQL Database
 
-## Step 3: Update Environment Variables
+1. In cPanel, find and click on "MySQL Databases" (under the Databases section)
+2. In the "Create New Database" section:
+   - Enter database name: `Laundry_Pos`
+   - Click "Create Database"
+3. You should see `techzontech_Laundry_Pos` in your database list
 
-Update the [.env](file://c:/Users/TECHZON-17/Desktop/Tally_Pos/backend-new/.env) file in the `backend-new` directory with your cPanel database information:
+### 3. Create Database User
 
-```env
-# Database Configuration for cPanel
-DB_HOST=your_cpanel_hostname_here
-DB_USER=your_cpanel_database_username
-DB_PASSWORD=your_cpanel_database_password
-DB_NAME=your_cpanel_database_name
-DB_PORT=3306
-DB_SSL=false
+1. In the "MySQL Databases" page, scroll to "Add New User" section
+2. Fill in the details:
+   - Username: `Pos_user` (cPanel will prefix it with your account name)
+   - Password: `Welc0me$27` (or a strong password of your choice)
+   - Confirm password
+3. Click "Create User"
 
-# JWT Secret
-JWT_SECRET=your_jwt_secret_here
-```
+### 4. Assign User to Database
 
-## Step 4: Create Database Tables
+1. Scroll to "Add User To Database" section
+2. Select the user: `techzontech_Pos_user`
+3. Select the database: `techzontech_Laundry_Pos`
+4. Click "Add"
+5. In the next screen, select "All Privileges" 
+6. Click "Make Changes"
 
-Run the table creation script:
+### 5. Enable Remote MySQL Access
 
-```bash
-cd backend-new
-npm run create-tables
-```
+1. Find and click on "Remote MySQL" (may be under Databases or Security section)
+2. In the "Add Access Hosts" section, add your IP address:
+   - To find your IP: visit https://www.whatismyip.com/
+   - Enter your IP address in the field
+   - Click "Add Host"
+3. Optionally, you can add `%` to allow connections from any IP (less secure)
 
-## Step 5: Test Database Connection
+### 6. Test Database Connection
 
-Test the connection with:
+After completing the above steps:
 
-```bash
-cd backend-new
-npm run test-db
-```
+1. Navigate to your project directory:
+   ```
+   cd c:\Users\TECHZON-17\Desktop\Tally_Pos\backend-new
+   ```
+
+2. Run the test script:
+   ```
+   node cpanel-db-setup.js
+   ```
+
+3. If successful, initialize the database:
+   ```
+   node init-cpanel-db.js
+   ```
 
 ## Troubleshooting
 
-### Common Issues
+### Common Issues and Solutions
 
-1. **ECONNREFUSED Error**: 
-   - Verify your DB_HOST is correct (not localhost)
-   - Ensure remote MySQL access is enabled in cPanel
-   - Check that your IP is whitelisted
+1. **Connection Timeout**
+   - Ensure remote MySQL access is enabled
+   - Verify your IP is whitelisted
+   - Check if your hosting provider requires a specific hostname
 
-2. **Access Denied Error**:
-   - Verify database username and password
-   - Confirm the user is assigned to the database with proper privileges
+2. **Access Denied**
+   - Double-check username and password
+   - Confirm user privileges on the database
+   - Some hosts require using `username_database` format for database name
 
-3. **SSL Connection Issues**:
-   - Try setting DB_SSL=false in your .env file
-   - If your host requires SSL, set DB_SSL=true
+3. **Host Not Found**
+   - Some hosts use a specific database hostname (not your domain)
+   - Check your hosting provider's documentation
+   - Common alternatives: `localhost`, `127.0.0.1`, or a specific server IP
 
-### Testing Connection to Specific Hosts
+4. **SSL Connection Issues**
+   - Try setting `DB_SSL=false` in your [.env](file:///C:/Users/TECHZON-17/Desktop/Tally_Pos/backend-new/.env) file
+   - Some hosts require SSL connections
 
-If you're having connection issues, you can test connectivity to your cPanel host:
+### Contact Your Hosting Provider
 
-```bash
-# Test if you can reach the host
-ping your_cpanel_hostname_here
+If you continue having issues:
+1. Ask for the correct database hostname
+2. Confirm if remote MySQL connections are allowed
+3. Check if there are any firewall restrictions
+4. Verify port 3306 is open for MySQL connections
 
-# Test if the MySQL port is open
-telnet your_cpanel_hostname_here 3306
-```
+## Security Recommendations
 
-## Security Considerations
+1. Use a strong password for your database user
+2. Only whitelist necessary IP addresses in Remote MySQL
+3. Regularly update your database credentials
+4. Limit user privileges to only what's necessary
+5. Consider using SSL connections in production
 
-1. Never commit your [.env](file://c:/Users/TECHZON-17/Desktop/Tally_Pos/backend-new/.env) file to version control
-2. Use strong passwords for your database user
-3. Limit database user privileges to only what's necessary
-4. Regularly rotate your database credentials
-5. If possible, use SSL connections (DB_SSL=true)
+## Next Steps
 
-## Deployment to Vercel
-
-When deploying to Vercel, you'll need to set the environment variables in the Vercel dashboard:
-
-1. Go to your Vercel project settings
-2. Navigate to the "Environment Variables" section
-3. Add all the DB_* variables from your .env file
+Once your database is set up and connected:
+1. Run `node init-cpanel-db.js` to create tables
+2. Start your server with `npm start`
+3. Access the application and log in with the default admin credentials
+4. Change the default admin password immediately

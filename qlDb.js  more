@@ -1,0 +1,126 @@
+[1mdiff --git a/backend-new/mysqlDb.js b/backend-new/mysqlDb.js[m
+[1mindex bcda845..b2909e6 100644[m
+[1m--- a/backend-new/mysqlDb.js[m
+[1m+++ b/backend-new/mysqlDb.js[m
+[36m@@ -11,12 +11,11 @@[m [mif (!isVercel) {[m
+ }[m
+ [m
+ console.log('Attempting to connect to MySQL database with the following configuration:');[m
+[31m-console.log('Host:', process.env.DB_HOST || '190.92.174.102'); // Default to IPv4 address[m
+[32m+[m[32mconsole.log('Host:', process.env.DB_HOST || 'localhost');[m
+ console.log('User:', process.env.DB_USER || 'root');[m
+ console.log('Database:', process.env.DB_NAME || 'Pos_system');[m
+ console.log('Port:', process.env.DB_PORT || 3306);[m
+ console.log('SSL:', process.env.DB_SSL === 'true' ? 'enabled' : 'disabled');[m
+[31m-console.log('Force IPv4:', process.env.DB_FORCE_IPV4 === 'true' ? 'enabled' : 'disabled');[m
+ console.log('Running on Vercel:', !!isVercel);[m
+ [m
+ // Check if environment variables are loaded[m
+[36m@@ -36,12 +35,6 @@[m [mif (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_NAME) {[m
+ // Add DNS resolution logging[m
+ const dns = require('dns');[m
+ [m
+[31m-// Force IPv4 if requested[m
+[31m-if (process.env.DB_FORCE_IPV4 === 'true') {[m
+[31m-  console.log('Forcing IPv4 resolution...');[m
+[31m-  dns.setDefaultResultOrder('ipv4first');[m
+[31m-}[m
+[31m-[m
+ dns.lookup(process.env.DB_HOST || 'localhost', (err, address, family) => {[m
+   if (err) {[m
+     console.error('❌ DNS lookup failed for DB_HOST:', err);[m
+[36m@@ -52,22 +45,19 @@[m [mdns.lookup(process.env.DB_HOST || 'localhost', (err, address, family) => {[m
+ [m
+ // Create a connection pool to the database[m
+ const pool = mysql.createPool({[m
+[31m-  host: process.env.DB_HOST || '190.92.174.102', // Default to IPv4 address[m
+[32m+[m[32m  host: process.env.DB_HOST || 'localhost',[m
+   user: process.env.DB_USER || 'root',[m
+   password: process.env.DB_PASSWORD || '',[m
+   database: process.env.DB_NAME || 'Pos_system',[m
+   port: process.env.DB_PORT || 3306,[m
+   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,[m
+[31m-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 2, // Reduced to 2[m
+[32m+[m[32m  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,[m
+   queueLimit: 0,[m
+   // Add connection timeout[m
+[31m-  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 5000, // 5 seconds[m
+[31m-  acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 5000, // 5 seconds[m
+[32m+[m[32m  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 20000, // 20 seconds[m
+   // Enable keep-alive[m
+   enableKeepAlive: true,[m
+   keepAliveInitialDelay: 0,[m
+[31m-  // Handle reconnect[m
+[31m-  reconnect: true,[m
+   // Removed invalid options that cause warnings[m
+ });[m
+ [m
+[36m@@ -84,58 +74,22 @@[m [masync function testConnection() {[m
+     return true;[m
+   } catch (err) {[m
+     console.error('Error connecting to the MySQL database:', err);[m
+[31m-    if (err.code === 'ETIMEDOUT') {[m
+[31m-      console.error('\n🔧 ETIMEDOUT Error Troubleshooting:');[m
+[31m-      console.error('This error means the connection attempt to your database timed out.');[m
+[31m-      console.error('Possible causes and solutions:');[m
+[31m-      console.error('1. ❌ Incorrect DB_HOST in .env file');[m
+[31m-      console.error('   Solution: Verify your database host is correct');[m
+[31m-      console.error('2. ❌ Remote MySQL not enabled in cPanel');[m
+[31m-      console.error('   Solution: Enable Remote MySQL in your cPanel');[m
+[31m-      console.error('3. ❌ Your IP is not whitelisted');[m
+[31m-      console.error('   Solution: Add your IP to Remote MySQL whitelist in cPanel');[m
+[31m-      console.error('4. ❌ Firewall blocking outgoing connections on port 3306');[m
+[31m-      console.error('   Solution: Check your firewall settings');[m
+[31m-      console.error('5. ❌ Hosting provider uses a different port');[m
+[31m-      console.error('   Solution: Check with your hosting provider for correct port');[m
+[31m-      console.error('6. ❌ Hosting provider requires a specific hostname');[m
+[31m-      console.error('   Solution: Check with your hosting provider for correct hostname');[m
+[31m-      console.error('7. ❌ IPv6 connection issues');[m
+[31m-      console.error('   Solution: Force IPv4 connection with DB_FORCE_IPV4=true');[m
+[31m-      console.error('\n🔧 Diagnostic Steps:');[m
+[31m-      console.error('1. Try connecting with a MySQL client:');[m
+[31m-      console.error('   mysql -h techzontech.com -u techzontech_Pos_user -p techzontech_Lanundry_Pos');[m
+[31m-      console.error('2. Check if you can reach the host:');[m
+[31m-      console.error('   ping techzontech.com');[m
+[31m-      console.error('3. Check if port 3306 is accessible:');[m
+[31m-      console.error('   telnet techzontech.com 3306');[m
+[31m-      console.error('   or');[m
+[31m-      console.error('   nc -zv techzontech.com 3306');[m
+[31m-    } else if (err.code === 'ECONNREFUSED') {[m
+[31m-      console.error('\n🔧 ECONNREFUSED Error Troubleshooting:');[m
+[31m-      console.error('This error means the connection was actively refused by the server.');[m
+[31m-      console.error('Possible causes:');[m
+[31m-      console.error('1. MySQL server is not running on the host');[m
+[31m-      console.error('2. MySQL is not accepting connections from your IP');[m
+[31m-      console.error('3. Incorrect port number');[m
+[31m-    } else if (err.code === 'ER_ACCESS_DENIED_ERROR') {[m
+[31m-      console.error('\n🔧 Access Denied Error Troubleshooting:');[m
+[31m-      console.error('This error means your credentials are incorrect.');[m
+[31m-      console.error('Possible causes:');[m
+[31m-      console.error('1. Incorrect username or password');[m
+[31m-      console.error('2. User does not have permission to access the database');[m
+[31m-      console.error('3. User is not allowed to connect from your IP');[m
+[31m-    }[m
+[32m+[m[32m    console.log('\nTroubleshooting steps:');[m
+[32m+[m[32m    console.log('1. Verify your database host in .env file (DB_HOST)');[m
+[32m+[m[32m    console.log('2. Check that your database and user exist');[m
+[32m+[m[32m    console.log('3. Verify your database credentials (username, password)');[m
+[32m+[m[32m    console.log('4. Ensure MySQL server is running');[m
+[32m+[m[32m    console.log('5. For cPanel databases, ensure remote MySQL access is enabled');[m
+[32m+[m[32m    console.log('6. For cPanel databases, ensure your IP is whitelisted');[m
+[32m+[m[32m    console.log('7. Try connecting with a MySQL client to verify credentials');[m
+[32m+[m[32m    console.log('8. Check if your hosting provider requires a specific database host');[m
+     return false;[m
+   }[m
+ }[m
+ [m
+ // Run test connection only in local development[m
+ if (!isVercel) {[m
+[31m-  // Don't block startup on connection test[m
+[31m-  testConnection().catch(err => {[m
+[31m-    console.error('Database connection test failed during startup:', err);[m
+[31m-  });[m
+[32m+[m[32m  testConnection();[m
+ }[m
+ [m
+ // Export the pool and helper functions[m

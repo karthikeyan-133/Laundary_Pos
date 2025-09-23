@@ -26,9 +26,9 @@ console.log('Returns router loaded:', !!returnsRouter);
 
 const app = express();
 
-// Use Vercel's PORT or default to 3002 for local development (changed from 3004 to avoid conflicts)
+// Use Vercel's PORT or default to 3005 for local development (changed from 3004 to avoid conflicts)
 // Vercel dynamically assigns a PORT through process.env.PORT
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3005;
 console.log('Server configured to run on port:', PORT);
 
 // ✅ Custom CORS middleware to ensure headers are always set
@@ -56,16 +56,6 @@ app.use((req, res, next) => {
   } else if (!origin) {
     // For requests with no origin (like mobile apps or curl requests)
     res.header('Access-Control-Allow-Origin', '*');
-  } else if (process.env.NODE_ENV === 'development') {
-    // In development, allow all origins for easier testing
-    res.header('Access-Control-Allow-Origin', origin || '*');
-  } else if (origin && origin.includes('vercel.app')) {
-    // For Vercel deployments, allow any vercel.app origin
-    // This helps with different deployment URLs
-    res.header('Access-Control-Allow-Origin', origin);
-  } else {
-    // Allow all origins as a fallback - this should resolve the CORS issue
-    res.header('Access-Control-Allow-Origin', origin || '*');
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -128,93 +118,29 @@ app.get("/api/cors-check", (req, res) => {
   res.json({ cors: "ok" });
 });
 
-// Add debugging endpoint
-app.get("/api/debug-cors", (req, res) => {
-  const origin = req.get('Origin');
-  const host = req.get('Host');
-  const referer = req.get('Referer');
-  
-  console.log('=== CORS DEBUG INFO ===');
-  console.log('Origin:', origin);
-  console.log('Host:', host);
-  console.log('Referer:', referer);
-  console.log('Request URL:', req.url);
-  console.log('Request Method:', req.method);
-  
-  res.json({ 
-    cors: "debug",
-    origin: origin,
-    host: host,
-    referer: referer,
-    requestUrl: req.url,
-    requestMethod: req.method
-  });
-});
-
-// Simple health check endpoint
-app.get("/api/health-check", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    message: "API is running",
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Database health check endpoint
-app.get("/api/db-health", async (req, res) => {
-  try {
-    console.log('Testing database connection...');
-    const result = await db.query('SELECT 1 as connected');
-    
-    if (result.length > 0 && result[0].connected === 1) {
-      res.json({ 
-        status: "ok", 
-        message: "Database connection successful",
-        timestamp: new Date().toISOString()
-      });
-    } else {
-      res.status(503).json({ 
-        status: "error", 
-        message: "Database connection test failed",
-        timestamp: new Date().toISOString()
-      });
-    }
-  } catch (err) {
-    console.error('Database health check failed:', err);
-    res.status(503).json({ 
-      status: "error", 
-      message: "Database connection failed",
-      error: err.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
+// Health check endpoint
 app.get('/health', async (req, res) => {
+  const healthStatus = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    database: {
+      connected: false,
+      error: null
+    },
+    uptime: process.uptime()
+  };
+
   try {
-    // Test MySQL connection
-    const result = await db.query('SELECT 1 as connected');
-    
-    if (result.length > 0) {
-      res.json({ 
-        status: 'healthy', 
-        message: 'API is running and database is connected',
-        timestamp: new Date().toISOString(),
-        database: 'connected'
-      });
-    } else {
-      return res.status(503).json({ 
-        status: 'unhealthy', 
-        message: 'Database connection failed'
-      });
-    }
-  } catch (err) {
-    res.status(503).json({ 
-      status: 'unhealthy', 
-      message: 'Health check failed',
-      error: err.message 
-    });
+    // Test database connection
+    await db.retryQuery('SELECT 1', [], 1, 1000); // Quick test with 1 retry
+    healthStatus.database.connected = true;
+  } catch (error) {
+    healthStatus.database.connected = false;
+    healthStatus.database.error = error.message;
+    healthStatus.status = 'degraded';
   }
+
+  res.status(healthStatus.database.connected ? 200 : 503).json(healthStatus);
 });
 
 // Protect all API routes except auth routes
@@ -784,21 +710,23 @@ if (!process.env.VERCEL) {
 // Initialize the database connection and start the server
 async function startServer() {
   try {
-    console.log('Testing database connection...');
-    // Test database connection with a simple query
-    const result = await db.query('SELECT 1 as connected');
+    // Test database connection with retry logic
+    console.log('🔄 Attempting to connect to MySQL database...');
+    await db.retryQuery('SELECT 1', [], 3, 3000); // 3 retries with 3 second delay
+    console.log('✅ Successfully connected to MySQL database');
     
-    if (result.length > 0 && result[0].connected === 1) {
-      console.log('✅ Successfully connected to MySQL database');
-    } else {
-      throw new Error('Database connection test failed');
+    // Initialize sequence counters with retry logic
+    try {
+      await db.retryQuery('SELECT 1', [], 2, 2000); // Quick check before initialization
+      await initializeSequences(db);
+      console.log('✅ Sequence counters initialized');
+    } catch (initError) {
+      console.warn('⚠️ Warning: Could not initialize sequence counters:', initError.message);
+      console.log('🔧 Server will continue running without sequence counter initialization');
     }
     
-    // Initialize sequence counters
-    await initializeSequences(db);
-    console.log('✅ Sequence counters initialized');
-    
     // Start the server
+    const PORT = process.env.PORT || 3001;
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 Access server at: http://localhost:${PORT}`);
@@ -808,62 +736,60 @@ async function startServer() {
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`Port ${PORT} is already in use. Please close the application using that port or use a different port.`);
-        // Try the next available port
-        const nextPort = PORT + 1;
-        console.log(`Trying port ${nextPort}...`);
-        const nextServer = app.listen(nextPort, '0.0.0.0', () => {
-          console.log(`🚀 Server running on port ${nextPort}`);
-          console.log(`📡 Access server at: http://localhost:${nextPort}`);
-        });
-        nextServer.on('error', (nextErr) => {
-          console.error(`Port ${nextPort} is also in use. Please close applications using ports ${PORT} and ${nextPort} or use a different port.`);
-          process.exit(1);
-        });
       } else {
         console.error('Server error:', err);
-        process.exit(1);
       }
     });
   } catch (err) {
-    console.error('❌ Database connection failed during startup:', err);
-    console.log('\n🔧 Server will start without database connection. You can still test API endpoints.');
-    console.log('🔧 Please check your cPanel Remote MySQL settings and IP whitelist.');
+    console.error('❌ Failed to start server:', err);
+    if (err.code === 'ETIMEDOUT') {
+      console.error('\n🔧 Database Connection Timeout:');
+      console.error('1. The database server is not responding or is unreachable');
+      console.error('2. Your IP may not be whitelisted for remote MySQL access');
+      console.error('3. The database server might be overloaded or down');
+      console.error('4. There might be network connectivity issues');
+      console.error('\n📋 Troubleshooting steps:');
+      console.error('- Verify remote MySQL access is enabled in cPanel');
+      console.error('- Add your IP to the remote MySQL whitelist');
+      console.error('- Check if your hosting provider requires a specific database host');
+      console.error('- Try connecting at a later time when network conditions improve');
+    } else if (err.message.includes('ECONNREFUSED')) {
+      console.error('\n🔧 Troubleshooting cPanel Database Connection:');
+      console.error('1. Verify your DB_HOST in the .env file is your cPanel hostname');
+      console.error('2. Ensure remote MySQL access is enabled in cPanel');
+      console.error('3. Check that your IP is whitelisted in cPanel remote MySQL settings');
+      console.error('4. Confirm your database user has proper permissions');
+      console.error('5. Verify database name, username, and password are correct');
+      console.error('6. If using SSL, ensure DB_SSL is set correctly in .env');
+    } else if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('\n❌ Database Access Denied:');
+      console.error('1. Check your database username and password');
+      console.error('2. Verify the user has proper permissions on the database');
+    }
     
-    // Start the server even without database connection
+    // Instead of exiting, let's start the server without database connection
+    // This allows the API to run for non-database operations
+    console.log('\n⚠️ Starting server in limited mode without database connection...');
+    console.log('⚠️ Some features may not work properly without database access');
+    
+    const PORT = process.env.PORT || 3001;
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on port ${PORT} (without database connection)`);
+      console.log(`🚀 Server running on port ${PORT} (limited mode - no database)`);
       console.log(`📡 Access server at: http://localhost:${PORT}`);
-      console.log('🔧 Database connection will be retried when API endpoints are accessed');
     });
     
     // Handle server errors
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`Port ${PORT} is already in use. Please close the application using that port or use a different port.`);
-        // Try the next available port
-        const nextPort = PORT + 1;
-        console.log(`Trying port ${nextPort}...`);
-        const nextServer = app.listen(nextPort, '0.0.0.0', () => {
-          console.log(`🚀 Server running on port ${nextPort} (without database connection)`);
-          console.log(`📡 Access server at: http://localhost:${nextPort}`);
-          console.log('🔧 Database connection will be retried when API endpoints are accessed');
-        });
-        nextServer.on('error', (nextErr) => {
-          console.error(`Port ${nextPort} is also in use. Please close applications using ports ${PORT} and ${nextPort} or use a different port.`);
-          process.exit(1);
-        });
       } else {
         console.error('Server error:', err);
-        process.exit(1);
       }
     });
   }
 }
 
-// Only start the server if not running on Vercel
-if (!process.env.VERCEL) {
-  startServer();
-}
+startServer();
 
 // Export the app for Vercel
 module.exports = app;
