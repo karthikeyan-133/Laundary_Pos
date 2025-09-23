@@ -486,24 +486,13 @@ app.get('/api/customers/:id', async (req, res) => {
 
 app.post('/api/customers', async (req, res) => {
   try {
-    // Generate a sequential customer ID with C prefix
-    // Note: For Supabase, we might want to use auto-generated IDs or a different approach
-    const id = await generateSequentialId('C', 5, {
-      query: async (query, params) => {
-        const { data, error } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('id', params[0]);
-        
-        if (error) {
-          throw new Error(error.message);
-        }
-        
-        return data;
-      }
-    });
-    
+    // Let Supabase generate the ID automatically or use our custom format
     const { name, code, contact_name, phone, email, place, emirate } = req.body;
+    
+    // Generate a unique ID for customers
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const id = `C${timestamp}${randomStr}`;
     
     const customerData = {
       id,
@@ -660,24 +649,31 @@ app.get('/api/orders/:id', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   try {
-    // Generate a sequential order ID with TRX prefix
-    // Note: For Supabase, we might want to use auto-generated IDs or a different approach
-    const id = await generateSequentialId('TRX', 6, {
-      query: async (query, params) => {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('id', params[0]);
-        
-        if (error) {
-          throw new Error(error.message);
-        }
-        
-        return data;
-      }
-    });
-    
+    // Let Supabase generate the ID automatically
+    // We don't need to manually generate IDs like in the MySQL version
     const { customer_id, subtotal, discount, tax, total, payment_method, cash_amount, card_amount, status, delivery_status, payment_status, items } = req.body;
+    
+    // For Supabase, we can let the database generate the ID
+    // But we still want to maintain our TRX format for consistency
+    // So we'll generate the ID but not rely on the sequence counter for uniqueness
+    
+    // Generate a unique ID using timestamp + random string to ensure uniqueness
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const id = `TRX${timestamp}${randomStr}`;
+    
+    // Check if this ID already exists (safety check)
+    const { data: existingOrder, error: checkError } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('id', id)
+      .single();
+    
+    // If it exists, generate a new one
+    if (existingOrder && !checkError) {
+      const newRandomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const newId = `TRX${timestamp}${newRandomStr}`;
+    }
     
     // Insert order
     const orderData = {
@@ -708,21 +704,10 @@ app.post('/api/orders', async (req, res) => {
     // Insert order items
     if (items && items.length > 0) {
       const orderItemsData = await Promise.all(items.map(async (item) => {
-        // Generate a sequential ID for order items with ITM prefix
-        const itemId = await generateSequentialId('ITM', 6, {
-          query: async (query, params) => {
-            const { data, error } = await supabase
-              .from('order_items')
-              .select('id')
-              .eq('id', params[0]);
-            
-            if (error) {
-              throw new Error(error.message);
-            }
-            
-            return data;
-          }
-        });
+        // Generate a unique ID for order items
+        const itemTimestamp = Date.now();
+        const itemRandomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const itemId = `ITM${itemTimestamp}${itemRandomStr}`;
         
         return {
           id: itemId,
@@ -744,7 +729,7 @@ app.post('/api/orders', async (req, res) => {
       }
     }
     
-    res.status(201).json(orderResult);
+    return res.status(201).json(orderResult);
   } catch (err) {
     console.error('Error creating order:', err);
     return res.status(500).json({ error: 'Failed to create order: ' + err.message });

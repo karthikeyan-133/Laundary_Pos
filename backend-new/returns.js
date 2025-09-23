@@ -1,6 +1,5 @@
 const express = require('express');
 const { supabase } = require('./supabaseClient');
-const { generateSequentialId } = require('./utils/idGenerator');
 
 const router = express.Router();
 
@@ -45,21 +44,10 @@ router.post('/', async (req, res) => {
   }
   
   try {
-    // Generate a sequential return ID with R prefix
-    const id = await generateSequentialId('R', 5, {
-      query: async (query, params) => {
-        const { data, error } = await supabase
-          .from('returns')
-          .select('id')
-          .eq('id', params[0]);
-        
-        if (error) {
-          throw new Error(error.message);
-        }
-        
-        return data;
-      }
-    });
+    // Generate a unique ID for returns
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const id = `R${timestamp}${randomStr}`;
     console.log('Generated return ID:', id);
     
     // Insert return record
@@ -86,21 +74,11 @@ router.post('/', async (req, res) => {
     // Insert return items
     if (items && items.length > 0) {
       const returnItems = await Promise.all(items.map(async (item) => {
-        // Generate a sequential ID for return items with RI prefix
-        const itemId = await generateSequentialId('RI', 6, {
-          query: async (query, params) => {
-            const { data, error } = await supabase
-              .from('return_items')
-              .select('id')
-              .eq('id', params[0]);
-            
-            if (error) {
-              throw new Error(error.message);
-            }
-            
-            return data;
-          }
-        });
+        // Generate a unique ID for return items
+        const itemTimestamp = Date.now();
+        const itemRandomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const itemId = `RI${itemTimestamp}${itemRandomStr}`;
+        
         return {
           id: itemId,
           return_id: id,
