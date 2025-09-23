@@ -14,6 +14,10 @@ const getApiBaseUrl = () => {
       // For Vercel deployments, we need to use the specific backend URL
       // since frontend and backend are deployed separately
       return 'https://laundary-pos-zb3p.vercel.app';
+    } else if (window.location.hostname.includes('techzontech.com')) {
+      // For cPanel deployments, API is at the same domain
+      // Use relative path for same-origin requests
+      return '';
     } else {
       // For local development - use localhost:3005 (updated from 3004)
       return 'http://localhost:3005';
@@ -31,7 +35,10 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
   // Ensure endpoint starts with /api and doesn't have double slashes
   let normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
   normalizedEndpoint = normalizedEndpoint.replace(/\/+/g, '/'); // Replace multiple slashes with single slash
-  const url = `${API_BASE_URL}${normalizedEndpoint}`;
+  
+  // For relative URLs (empty API_BASE_URL), use the normalized endpoint directly
+  // For absolute URLs, combine with the base URL
+  const url = API_BASE_URL ? `${API_BASE_URL}${normalizedEndpoint}` : normalizedEndpoint;
   
   console.log(`Making API request to: ${url}`, options);
   
