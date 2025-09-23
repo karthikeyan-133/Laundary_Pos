@@ -56,6 +56,12 @@ app.use((req, res, next) => {
   } else if (!origin) {
     // For requests with no origin (like mobile apps or curl requests)
     res.header('Access-Control-Allow-Origin', '*');
+  } else {
+    // For production environments, we might want to be more permissive
+    // Check if it's a vercel.app domain
+    if (origin && origin.endsWith('.vercel.app')) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -75,12 +81,44 @@ app.use((req, res, next) => {
 // Apply express.json middleware
 app.use(express.json({ limit: '10mb' }));
 
+// Handle preflight requests for all routes
+app.options('*', (req, res) => {
+  console.log('Global OPTIONS request received');
+  const origin = req.get('Origin');
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Auth-Token');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).end();
+});
+
+// Special CORS middleware for API routes
+app.use('/api/*', (req, res, next) => {
+  const origin = req.get('Origin');
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Auth-Token');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
+
 // Use returns router
 app.use('/api/returns', returnsRouter);
 console.log('Returns router mounted at /api/returns');
 
-// Use auth router
-app.use('/api/auth', authRouter);
+// Use auth router with CORS headers
+app.use('/api/auth', (req, res, next) => {
+  const origin = req.get('Origin');
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Auth-Token');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+}, authRouter);
 console.log('Auth router mounted at /api/auth');
 
 // Routes
